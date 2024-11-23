@@ -1,11 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <getopt.h>
+#include <string.h>
 #include "file_handler.h"
 #include "deduplication.h"
 #include "backup_manager.h"
 #include "network.h"
-
 
 int main(int argc, char *argv[]) {
     // Analyse des arguments de la ligne de commande
@@ -24,51 +24,53 @@ int main(int argc, char *argv[]) {
 		{.name="verbose",.has_arg=0,.flag=0,.val='v'},
 		{.name=0,.has_arg=0,.flag=0,.val=0},
 	};
-	char *source = ".";
+
+	char *source = NULL, *dest = NULL, *d_server = NULL, *s_server = NULL;;
+	int backup=0, restore=0, list_backup=0, dry_run=0, verbose=0, d_port = 0, s_port = 0;
 	while ((opt = getopt_long(argc, argv, "", my_opts, NULL)) != -1) {
 		switch (opt) {
 			case 'b':
-				printf("b\n");
+				backup = 1;
 				break;
 
 			case 'r':
-				printf("r\n");
+				restore = 1;
 				break;
 
 			case 'l':
-				printf("l\n");
+				list_backup = 1;
 				break;
 
 			case 'u':
-				printf("dr\n");
+				dry_run = 1;
 				break;
 
 			case 'e':
-				printf("ds\n");
+				d_server = strdup(optarg);
 				break;
 
             case 'p':
-				printf("dp\n");
+				d_port = atoi(optarg);
 				break;
 
 			case 'a':
-				printf("ss\n");
+				s_server = strdup(optarg);
 				break;
 
 			case 't':
-				printf("sp\n");
+				s_port = atoi(optarg);
 				break;
 
             case 'd':
-				printf("d\n");
+				dest = strdup(optarg);
 				break;
 
 			case 's':
-				printf("s\n");
+				source = strdup(optarg);
 				break;
 
 			case 'v':
-				printf("v\n");
+				verbose = 1;
 				break;
 
 			case '?': // Option non reconnue
@@ -78,12 +80,6 @@ int main(int argc, char *argv[]) {
 	}
     // Implémentation de la logique de sauvegarde et restauration
     // Exemples : gestion des options --backup, --restore, etc.
-    char *test = list_files("./src");
-	if (test) {
-		printf("Fichiers : %s\n", test);
-		free(test); // Libérer la mémoire après utilisation
-	} else {
-		printf("Aucun fichier trouvé ou erreur lors de l'ouverture du répertoire.\n");
-	}
+	printf("Liste option :\n backup : %d\n restore : %d\n list-backups : %d\n dry-run : %d\n d-server : %s\n d-port : %d\n s-server : %s\n s-port : %d\n destination %s\n source %s\n verbose %d\n",backup,restore,list_backup,dry_run,d_server,d_port,s_server,s_port,dest,source,verbose);
     return EXIT_SUCCESS;
 }
