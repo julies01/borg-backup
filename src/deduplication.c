@@ -6,8 +6,23 @@
 #include <dirent.h>
 #include <dlfcn.h>
 #include <sys/stat.h>
+#include <libgen.h>
 #include <unistd.h>
 
+/**
+ * @brief Une fonction qui alloue de la mémoire pour une copie de la chaîne d'entrée, y copie les caractères, et renvoie un pointeur vers la chaîne dupliquée.
+ * 
+ * @param s la chaîne à dupliquer
+ * @return char le pointeur vers la chaîne dupliquée
+ */
+char *strdup(const char *s) {
+    size_t len = strlen(s) + 1;
+    char *copy = malloc(len);
+    if (copy) {
+        memcpy(copy, s, len);
+    }
+    return copy;
+}
 
 /** 
  * @brief Une procédure qui vérifie si un paquet est installé et donne la commande pour l'installer dans le cas échéant
@@ -18,20 +33,11 @@
 
 void check_pckg(char *nom_pckg, char *commande_installer_pckg){
      #ifndef nom_pckg
-        printf("%s n'est pas disponible.\n");
+        printf("%s n'est pas disponible.\n",nom_pckg);
         printf("Pour l'installer, saissisez la commande suivant dans le terminal : \n");
         printf("%s\n",commande_installer_pckg);
     #endif
 }
-
-
-typedef struct FileChunk {
-    unsigned char hash[HASH_SIZE];
-    char *filename;
-    unsigned int id_chunk;
-    unsigned int version;
-    struct FileChunk *next; // Pointeur vers le prochain bloc de données
-} FileChunk;
 
 FileChunk *table_hashage[TAILLE_TABLE];
 
@@ -127,17 +133,23 @@ void hash_chunk(const unsigned char *chunk_data, size_t chunk_size, unsigned cha
  */
 unsigned int stocker_chunk_data(const unsigned char *chunk_data, size_t chunk_size, unsigned int version, const char *filename, const char *destination) {
     static unsigned int chunk_id = 0;
-    char *chunk_filename;
+    char chunk_filename[MAX_NOM_FICHIER];
+
+    char *base_name = basename((char*)filename);
+    char *ext_pos = strrchr(base_name, '.');
+    if (ext_pos != NULL) {
+        *ext_pos = '\0';
+    }
 
     //Cherche l'extension du fichier
     const char *ext = strrchr(filename, '.');
     if (ext == NULL) {
         //Pas d'extension
-        snprintf(chunk_filename, sizeof(chunk_filename), "%s/chunk_%u_v%u.bin", destination, chunk_id, version);
+        snprintf(chunk_filename, sizeof(chunk_filename), "%s/%s_%u_v%u.bin", destination, base_name,chunk_id, version);
     } else {
-        snprintf(chunk_filename, sizeof(chunk_filename), "%s/chunk_%u_v%u%s", destination, chunk_id, version, ext);
+        snprintf(chunk_filename, sizeof(chunk_filename), "%s/%s_%u_v%u%s", destination, base_name, chunk_id, version, ext);
     }
-
+    printf("Generated filename: %s\n", chunk_filename);
     FILE *chunk_file = fopen(chunk_filename, "wb");
     if (!chunk_file) {
         perror("Impossible de stocker le chunk");
@@ -167,7 +179,6 @@ void traitement_fichier(const char *filename, const char *destination) {
     unsigned char tampon[CHUNK_SIZE];
     unsigned char hash[HASH_SIZE];
     size_t bytes_lus;
-    int index_chunk = 0;
 
     //Découpe du fichier en blocs de données (chunks)
     while ((bytes_lus = fread(tampon, 1, CHUNK_SIZE, fichier)) > 0) {

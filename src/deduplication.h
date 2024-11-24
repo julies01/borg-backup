@@ -8,12 +8,23 @@
 #include <dirent.h>
 #include <dlfcn.h>
 #include <sys/stat.h>
+#include <libgen.h>
 #include <unistd.h>
 
 #define HASH_SIZE MD5_DIGEST_LENGTH // Taille du hachage MD5
 #define CHUNK_SIZE 4096            // Taille d'un bloc de donnée 4Ko
 #define TAILLE_TABLE 1024
+#define MAX_NOM_FICHIER 1024
 
+typedef struct FileChunk {
+    unsigned char hash[HASH_SIZE];
+    char *filename;
+    unsigned int id_chunk;
+    unsigned int version;
+    struct FileChunk *next; // Pointeur vers le prochain bloc de données
+} FileChunk;
+
+char *strdup(const char *s);
 void check_pckg(char *nom_pckg, char *commande_installer_pckg);
 unsigned int determine_index_hash(unsigned char *hash);
 void insere_file_chunk(FileChunk **table, unsigned char *hash, const char *filename, unsigned int id_chunk, unsigned int version);
