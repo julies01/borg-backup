@@ -1,245 +1,139 @@
 #include "deduplication.h"
+#include "file_handler.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <openssl/md5.h>
 #include <dirent.h>
-#include <dlfcn.h>
-#include <sys/stat.h>
-#include <libgen.h>
-#include <unistd.h>
+
+Md5Entry hash_table[HASH_TABLE_SIZE];
+Chunk *chunks;
 
 /**
- * @brief Une fonction qui alloue de la mémoire pour une copie de la chaîne d'entrée, y copie les caractères, et renvoie un pointeur vers la chaîne dupliquée.
+ * @brief Fonction de hachage MD5 pour l'indexation dans la table de hachage
  * 
- * @param s la chaîne à dupliquer
- * @return char le pointeur vers la chaîne dupliquée
+ * @param md5 la somme MD5 du chunk
+ * @return unsigned int l'index de hachage
  */
-char *strdup(const char *s) {
-    size_t len = strlen(s) + 1;
-    char *copy = malloc(len);
-    if (copy) {
-        memcpy(copy, s, len);
+unsigned int hash_md5(unsigned char *md5) {
+    unsigned int hash = 0;
+    for (int i = 0; i < MD5_DIGEST_LENGTH; i++) {
+        hash = (hash << 5) + hash + md5[i];
     }
-    return copy;
+    return hash % HASH_TABLE_SIZE;
 }
 
-/** 
- * @brief Une procédure qui vérifie si un paquet est installé et donne la commande pour l'installer dans le cas échéant
+/**
+ * @brief Fonction pour calculer le MD5 d'un chunk
  * 
- * @param nom_pckg le nom du paquet à vérifier
- * @param commande_installer_pckg la commande pour installer la bibliothèque contenant le paquet
+ * @param data le contenu du chunk
+ * @param len la taille du chunk
+ * @param md5_out la somme MD5 du chunk en sortie
  */
+void compute_md5(void *data, size_t len, unsigned char *md5_out) {
+    MD5(data, len, md5_out);// Fonction de la librairie openssl qui permet de calculer le MD5 d'un chunk
 
-void check_pckg(char *nom_pckg, char *commande_installer_pckg){
-     #ifndef nom_pckg
-        printf("%s n'est pas disponible.\n",nom_pckg);
-        printf("Pour l'installer, saissisez la commande suivant dans le terminal : \n");
-        printf("%s\n",commande_installer_pckg);
-    #endif
 }
-
-FileChunk *table_hashage[TAILLE_TABLE];
 
 
 /**
- * @brief Une fonction qui détermine l'index d'un hachage dans la table de hachage
+ * @brief Fonction permettant de chercher un MD5 dans la table de hachage
  * 
- * @param hash une partie de fichier de 16 bytes
- * @return unsigned int, l'index du hachage dans la table de hachage
+ * @param hash_table le tableau de hachage qui contient les MD5 et l'index des chunks unique
+ * @param md5 md5 est le md5 du chunk dont on veut déterminer l'unicité
+ * @return int l'index s'il trouve le md5 dans le tableau et -1 sinon
  */
-unsigned int determine_index_hash(unsigned char *hash) {
-    //Le principe de la fonction est de répartir les hachages de manière uniforme dans la table de hachage
-    unsigned int hash_value = 0;
-    for (int i = 0; i < HASH_SIZE; i++) {
-        hash_value = (hash_value * 31) + hash[i]; //On multiplie par 31 car 31 est un nombre premier
-    }
-    return hash_value % TAILLE_TABLE;
-}
-
-
-
-/**
- * @brief Une procédure qui insère un bloc de données dans la table de hachage
- * 
- * @param table la table de hachage
- * @param hash 
- * @param filename 
- * @param id_chunk 
- * @param version 
- */
-void insere_file_chunk(FileChunk **table, unsigned char *hash, const char *filename, unsigned int id_chunk, unsigned int version) {
-    unsigned int index = determine_index_hash(hash);
-
-    //Crée un nouveau file chunk
-    FileChunk *nouveau_chunk = (FileChunk *)malloc(sizeof(FileChunk));
-    memcpy(nouveau_chunk->hash, hash, HASH_SIZE);
-    nouveau_chunk->filename = strdup(filename);
-    nouveau_chunk->id_chunk = id_chunk;
-    nouveau_chunk->version = version;
-    nouveau_chunk->next = table[index];
-
-    table[index] = nouveau_chunk;
-}
-
-
-
-/**
- * @brief Une fonction qui vérifie si un bloc de données est un doublon est renvoie l'original si oui
- * 
- * @param table 
- * @param hash 
- * @return FileChunk* 
- */
-FileChunk *trouver_double(FileChunk **table, unsigned char *hash) {
-    unsigned int index = determine_index_hash(hash);
-
-    // Traverse la liste chaînée à l'indice donné pour voir si il ya un doublon
-    FileChunk *courant = table[index];
-    while (courant) {
-        if (memcmp(courant->hash, hash, HASH_SIZE) == 0) {
-            return courant; // renvoie l'orginal si celui en doublon a été trouvé
+int find_md5(Md5Entry *hash_table, unsigned char *md5) {
+    int i;
+    for (i = 0; i < HASH_TABLE_SIZE; i++){ // Parcours de la table de hachage
+        if (memcmp(hash_table[i].md5,md5,MD5_DIGEST_LENGTH)==0){ 
+            return hash_table[i].index; // Retourne l'index si le md5 est trouvé
         }
-        courant = courant->next;
     }
-
-    return NULL; // pas de doublon trouvé
+        return -1;
 }
 
 
-
 /**
- * @brief Une procédure qui calcule le hachage MD5 d'un bloc de données
+ * @brief Fonction pour ajouter un MD5 dans la table de hachage
  * 
- * @param chunk_data le bloc de données
- * @param chunk_size la taille du bloc de données
- * @param hash la taille du hachage MD5
+ * @param hash_table le tableau de hachage qui contient les MD5 et l'index des chunks unique
+ * @param md5 le md5 du chunk à ajouter
+ * @param index l'index du chunk
  */
-void hash_chunk(const unsigned char *chunk_data, size_t chunk_size, unsigned char hash[HASH_SIZE]) {
-    MD5(chunk_data, chunk_size, hash);
+void add_md5(Md5Entry *hash_table, unsigned char *md5, int index) {
+        while (hash_table[index].md5[0] == '\0'){ 
+            index++;
+        }
+        hash_table[index].index = index;
+        memcpy(hash_table[index].md5, md5, MD5_DIGEST_LENGTH); // memcpy est une fonction qui copie un certain nombre de bytes d'un espace mémoire à un autre
 }
 
-
-
 /**
- * @brief Une fonction qui stocke un bloc de données dans un fichier
+ * @brief Fonction pour convertir un fichier non dédupliqué en tableau de chunks
  * 
- * @param chunk_data 
- * @param chunk_size 
- * @param version 
- * @param filename 
- * @param destination_dir 
- * @return unsigned int l'identifiant du bloc de données
+ * @param file le fichier qui sera dédupliqué
+ * @param chunks le tableau de chunks initialisés qui contiendra les chunks issu du fichier
+ * @param hash_table le tableau de hachage qui contient les MD5 et l'index des chunks unique
  */
-unsigned int stocker_chunk_data(const unsigned char *chunk_data, size_t chunk_size, unsigned int version, const char *filename, const char *destination) {
-    static unsigned int chunk_id = 0;
-    char chunk_filename[MAX_NOM_FICHIER];
-
-    char *base_name = basename((char*)filename);
-    char *ext_pos = strrchr(base_name, '.');
-    if (ext_pos != NULL) {
-        *ext_pos = '\0';
-    }
-
-    //Cherche l'extension du fichier
-    const char *ext = strrchr(filename, '.');
-    if (ext == NULL) {
-        //Pas d'extension
-        snprintf(chunk_filename, sizeof(chunk_filename), "%s/%s_%u_v%u.bin", destination, base_name,chunk_id, version);
-    } else {
-        snprintf(chunk_filename, sizeof(chunk_filename), "%s/%s_%u_v%u%s", destination, base_name, chunk_id, version, ext);
-    }
-    printf("Generated filename: %s\n", chunk_filename);
-    FILE *chunk_file = fopen(chunk_filename, "wb");
-    if (!chunk_file) {
-        perror("Impossible de stocker le chunk");
-        exit(1);
-    }
-    fwrite(chunk_data, 1, chunk_size, chunk_file);
-    fclose(chunk_file);
-
-    return chunk_id++;
-}
-
-
-
-/**
- * @brief Une procédure qui traite un fichier en le découpant en blocs de données et en les stockant
- * 
- * @param filename le nom du fichier
- * @param destination le répertoire de destination 
- */
-void traitement_fichier(const char *filename, const char *destination) {
-    FILE *fichier = fopen(filename, "rb"); // Ouvre le fichier en mode lecture binaire
-    if (!fichier) {
-        perror("Erreur lors de l'ouverture du fichier");
-        return;
-    }
-
+void deduplicate_file(FILE *file, Chunk *chunks, Md5Entry *hash_table){
+    int chunk_count = 0;
     unsigned char tampon[CHUNK_SIZE];
-    unsigned char hash[HASH_SIZE];
+    unsigned char hash[MD5_DIGEST_LENGTH];
     size_t bytes_lus;
 
-    //Découpe du fichier en blocs de données (chunks)
-    while ((bytes_lus = fread(tampon, 1, CHUNK_SIZE, fichier)) > 0) {
-        
-        hash_chunk(tampon, bytes_lus, hash);
+    while ((bytes_lus = fread(tampon, 1, CHUNK_SIZE, file)) > 0) { // Lecture du fichier en chunks
+        compute_md5(tampon, bytes_lus, hash);
 
-        //On véririfie si le chunk est un doublon
-        FileChunk *doublon = trouver_double(table_hashage, hash);
-        if (doublon) {
-            // If it is a duplicate, increment version number
-            unsigned int new_version = doublon->version + 1;
-            unsigned int new_chunk_id = stocker_chunk_data(tampon, bytes_lus, new_version, filename, destination);  // Store as new version
-            insere_file_chunk(table_hashage, hash, filename, new_chunk_id, new_version);        // Insert the new version into the hash table
-        } else {            
-            unsigned int id_chunk = stocker_chunk_data(tampon, bytes_lus, 0, filename, destination);  //Stocke le nouveau chunk
-            insere_file_chunk(table_hashage, hash, filename, id_chunk, 0); //Insère le chunk dans la table de hachage
+        int index = find_md5(hash_table, hash);
+        if (index == -1){ // Si le chunk n'est pas déjà présent dans la table de hachage 
+            index = hash_md5(hash);
+            add_md5(hash_table, hash, index); // Ajout du chunk dans la table de hachage
         }
+        //Dans tous les cas, on ajoute le chunk dans le tableau de chunks
+        chunks[chunk_count].data = malloc(CHUNK_SIZE);
+        memcpy(chunks[chunk_count].data, tampon, CHUNK_SIZE);
+        memcpy(chunks[chunk_count].md5, hash, MD5_DIGEST_LENGTH);
+        chunk_count++;
     }
-
-    fclose(fichier);
 }
-
 
 
 /**
- * @brief Une procédure qui déduplique les fichiers d'un répertoire source et les stocke dans un répertoire de destination
+ * @brief Fonction permettant de charger un fichier dédupliqué en table de chunks en remplaçant les références par les données correspondantes
  * 
- * @param source le chemin du répertoire source que l'on veut dédupliquer
- * @param destination le chemin du répertoire de destination de la déduplication
+ * @param file le nom du fichier dédupliqué
+ * @param chunks représente le tableau de chunk qui contiendra les chunks restauré depuis filename
+ * @param chunk_count est un compteur du nombre de chunk restauré depuis le fichier filename
  */
-void deduplicate_files(const char *source, const char *destination) {
-  DIR *dir = opendir(source);
-    if (!dir) {
-        perror("Erreur lors de l'ouverture du répertoire source");
-        return;
-    }
+void undeduplicate_file(FILE *file, Chunk *chunks, int *chunk_count) {
+    unsigned char hash[MD5_DIGEST_LENGTH];
+    unsigned char tampon[CHUNK_SIZE];
+    size_t bytes_lus;
 
-    struct dirent *entree;
-    struct stat stat_entree;
-    char chemin_source[1024];
-
-    //Parcours du répertoire source
-    while ((entree = readdir(dir)) != NULL) {
-        // Ignorer tous les fichiers cachés
-        if (strcmp(entree->d_name, ".") == 0 || strcmp(entree->d_name, "..") == 0)
-            continue;
-
-        snprintf(chemin_source, sizeof(chemin_source), "%s/%s", source, entree->d_name); //Crée un nouveau chemin source
-        if (stat(chemin_source, &stat_entree) == -1) {
-            perror("Erreur lors de la récupération des informations sur le fichier");
-            continue;
+    while ((bytes_lus = fread(hash, 1, MD5_DIGEST_LENGTH, file)) > 0) { // Lecture des sommes MD5 des chunks du fichier 
+        int i;
+        int index = find_md5(hash_table, hash); // Recherche de la somme MD5 dans la table de hachage
+        if (index == -1) {
+            fprintf(stderr, "Erreur: chunk introuvable dans la table de hachage\n");
+            return;
         }
 
-        if (S_ISDIR(stat_entree.st_mode)) {
-            //Appel récursif si c'est un répertoire
-            deduplicate_files(chemin_source, destination);
-        } else if (S_ISREG(stat_entree.st_mode)) {
-            //Traiter le fichier si c'est un fichier normal
-            traitement_fichier(chemin_source, destination);
+        int trouve = 0;
+        for (i = 0; i < *chunk_count; i++) {
+            if (memcmp(chunks[i].md5, hash,MD5_DIGEST_LENGTH) == 0) {
+                memcpy(tampon, chunks[index].data, CHUNK_SIZE); //On copie le chunk dans le tampon
+                fwrite(tampon, 1, CHUNK_SIZE, file);
+                (*chunk_count)++;
+                trouve = 1;
+                break;
+            }
+        }
+        if (!trouve) {
+            fprintf(stderr, "Erreur: chunk correspondant au hash introuvable\n");
+            return;
         }
     }
-
-    closedir(dir);
+   
 }
+

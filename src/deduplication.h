@@ -6,32 +6,40 @@
 #include <string.h>
 #include <openssl/md5.h>
 #include <dirent.h>
-#include <dlfcn.h>
-#include <sys/stat.h>
-#include <libgen.h>
-#include <unistd.h>
 
-#define HASH_SIZE MD5_DIGEST_LENGTH // Taille du hachage MD5
-#define CHUNK_SIZE 4096            // Taille d'un bloc de donnée 4Ko
-#define TAILLE_TABLE 1024
-#define MAX_NOM_FICHIER 1024
+// Taille d'un chunk (4096 octets)
+#define CHUNK_SIZE 4096
 
-typedef struct FileChunk {
-    unsigned char hash[HASH_SIZE];
-    char *filename;
-    unsigned int id_chunk;
-    unsigned int version;
-    struct FileChunk *next; // Pointeur vers le prochain bloc de données
-} FileChunk;
+// Taille de la table de hachage qui contiendra les chunks
+// dont on a déjà calculé le MD5 pour effectuer les comparaisons
+#define HASH_TABLE_SIZE 1000
 
-char *strdup(const char *s);
-void check_pckg(char *nom_pckg, char *commande_installer_pckg);
-unsigned int determine_index_hash(unsigned char *hash);
-void insere_file_chunk(FileChunk **table, unsigned char *hash, const char *filename, unsigned int id_chunk, unsigned int version);
-FileChunk *trouver_double(FileChunk **table, unsigned char *hash);
-void hash_chunk(const unsigned char *chunk_data, size_t chunk_size, unsigned char hash[HASH_SIZE]);
-unsigned int stocker_chunk_data(const unsigned char *chunk_data, size_t chunk_size, unsigned int version, const char *filename, const char *destination);
-void traitement_fichier(const char *filename, const char *destination);
-void deduplicate_files(const char *source, const char *destination);
+// Structure pour un chunk
+typedef struct {
+    unsigned char md5[MD5_DIGEST_LENGTH]; // MD5 du chunk
+    void *data; // Données du chunk
+} Chunk;
+
+// Table de hachage pour stocker les MD5 et leurs index
+typedef struct {
+    unsigned char md5[MD5_DIGEST_LENGTH];
+    int index;
+
+} Md5Entry;
+
+
+// Fonction de hachage MD5 pour l'indexation dans la table de hachage
+unsigned int hash_md5(unsigned char *md5);
+// Fonction pour calculer le MD5 d'un chunk
+void compute_md5(void *data, size_t len, unsigned char *md5_out);
+// Fonction permettant de chercher un MD5 dans la table de hachage
+int find_md5(Md5Entry *hash_table, unsigned char *md5);
+// Fonction pour ajouter un MD5 dans la table de hachage
+void add_md5(Md5Entry *hash_table, unsigned char *md5, int index);
+// Fonction pour convertir un fichier non dédupliqué en tableau de chunks
+void deduplicate_file(FILE *file, Chunk *chunks, Md5Entry *hash_table);
+// Fonction permettant de charger un fichier dédupliqué en table de chunks
+// en remplaçant les références par les données correspondantes
+void undeduplicate_file(FILE *file, Chunk *chunks, int *chunk_count);
 
 #endif // DEDUPLICATION_H
