@@ -113,7 +113,7 @@ Chunk_list add_unique_chunk(Chunk_list chunk,unsigned char *md5, unsigned char *
 }
 
 //pas encore vérifié
-Chunk_list add_seen_chunk(Chunk_list chunk, unsigned char *md5, int index){
+Chunk_list add_seen_chunk(Chunk_list chunk, unsigned char *md5){
     Chunk *new_el = (Chunk *)malloc(sizeof(Chunk));
     memcpy(new_el->md5, md5, MD5_DIGEST_LENGTH);
     new_el->data = NULL;
@@ -158,6 +158,27 @@ void see_hash_table(Md5Entry **hash_table){
 }
 
 /**
+ * @brief Fonction pour afficher la liste de chunks
+ * 
+ * @param chunk la liste de chunks
+ */
+void see_chunk_list(Chunk_list chunk){
+    Chunk *current = chunk;
+    while (current != NULL){
+        for (int j = 0; j < MD5_DIGEST_LENGTH; j++){
+            printf("%02x et", current->md5[j]);
+            if (current->data == NULL){
+                printf(" data nulle \n");
+            }
+            else
+            printf(" la data à l'adresse : %p\n", current->data);
+        }
+        printf("\n\n");
+        current = current->next;
+    }
+}
+
+/**
  * @brief Fonction pour convertir un fichier non dédupliqué en tableau de chunks
  * 
  * @param file le fichier qui sera dédupliqué
@@ -178,12 +199,13 @@ void deduplicate_file(FILE *file, Chunk_list chunks, Md5Entry **hash_table){
             chunks = add_unique_chunk(chunks, hash, tampon);
             //see_hash_table(hash_table);
         }
-        //Dans tous les cas, on ajoute le chunk dans le tableau de chunks
-        /*chunks[chunk_count].data = malloc(CHUNK_SIZE);
-        memcpy(chunks[chunk_count].data, tampon, CHUNK_SIZE);
-        memcpy(chunks[chunk_count].md5, hash, MD5_DIGEST_LENGTH);
-        chunk_count++;*/
+        else {
+            chunks = add_seen_chunk(chunks, hash);
+        }
     }
+    see_chunk_list(chunks);
+    printf("____________________________________________________________________________________\n");
+    //see_hash_table(hash_table);
 }
 
 
