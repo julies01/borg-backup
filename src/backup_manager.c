@@ -19,16 +19,41 @@ void create_backup(const char *source_dir, const char *backup_dir) {
 void write_backup_file(const char *output_filename, Chunk *chunks, int chunk_count) {
     /*
     */
-    FILE *file = fopen(output_filename, "rb");
-    Md5Entry *hash_table;
-    deduplicate_file(file,chunks,hash_table);
 }
 
 // Fonction implémentant la logique pour la sauvegarde d'un fichier
 void backup_file(const char *filename) {
-    /*
-    */
+    FILE *file = fopen(filename, "rb");
+    if (!file) {
+        perror("Erreur lors de l'ouverture du fichier");
+        return;
+    }
 
+    Md5Entry *hash_table = malloc(HASH_TABLE_SIZE * sizeof(Md5Entry));
+    if (!hash_table) {
+        fprintf(stderr, "Erreur : allocation mémoire échouée pour la table de hachage.\n");
+        fclose(file);
+        return;
+    }
+
+    size_t max_chunks = 1000;
+    Chunk *chunks = malloc(max_chunks * sizeof(Chunk));
+    if (!chunks) {
+        fprintf(stderr, "Erreur : allocation mémoire échouée pour les chunks.\n");
+        free(hash_table);
+        fclose(file);
+        return;
+    }
+
+    deduplicate_file(file, chunks, hash_table);
+    write_backup_file("./test.txt", chunks,)
+
+    for (size_t i = 0; i < max_chunks; i++) {
+        free(chunks[i].data);
+    }
+    free(chunks);
+    free(hash_table);
+    fclose(file);
 }
 
 
