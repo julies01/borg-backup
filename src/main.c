@@ -1,13 +1,24 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <getopt.h>
 #include <string.h>
+#include <getopt.h>
 #include "file_handler.h"
 #include "deduplication.h"
 #include "backup_manager.h"
 #include "network.h"
-#include <stdio.h>
-#include <stdlib.h>
+
+char *strdup(const char *s) {
+    if (s == NULL) {
+        return NULL;
+    }
+    char *copy = (char *)malloc(strlen(s) + 1);
+    if (copy == NULL) {
+        return NULL;
+    }
+    strcpy(copy, s);
+    return copy;
+}
+
 int main(int argc, char *argv[]) {
     // Analyse des arguments de la ligne de commande
 	int opt = 0;
@@ -26,7 +37,10 @@ int main(int argc, char *argv[]) {
 		{.name=0,.has_arg=0,.flag=0,.val=0},
 	};
 
-	char *source = NULL, *dest = NULL, *d_server = NULL, *s_server = NULL;;
+	char *source = NULL;
+	char *dest = NULL;
+	char *d_server = NULL;
+	char *s_server = NULL;
 	int backup=0, restore=0, list_back=0, dry_run=0, verbose=0, d_port = 0, s_port = 0;
 	while ((opt = getopt_long(argc, argv, "", my_opts, NULL)) != -1) {
 		switch (opt) {
@@ -82,7 +96,7 @@ int main(int argc, char *argv[]) {
     // Implémentation de la logique de sauvegarde et restauration
     // Exemples : gestion des options --backup, --restore, etc.
 	printf("Liste option :\n backup : %d\n restore : %d\n list-backups : %d\n dry-run : %d\n d-server : %s\n d-port : %d\n s-server : %s\n s-port : %d\n destination %s\n source %s\n verbose %d\n",backup,restore,list_back,dry_run,d_server,d_port,s_server,s_port,dest,source,verbose);
-	list_backup(source,verbose);
+
 	
     return EXIT_SUCCESS;
 }
