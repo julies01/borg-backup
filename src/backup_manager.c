@@ -19,6 +19,23 @@ void create_backup(const char *source_dir, const char *backup_dir) {
 void write_backup_file(const char *output_filename, Chunk *chunks, int chunk_count) {
     /*
     */
+    // Ouvrir le fichier en mode ajout binaire
+    FILE *file = fopen(output_filename, "wb");
+    if (!file) {
+        perror("Erreur lors de l'ouverture du fichier");
+        return;
+    }
+    while(chunks->next != NULL){
+        if(chunks->data != NULL){
+            int size = 4096;
+            size_t written_size = fwrite(chunks->data,size,1,file);
+            if (written_size != 1) {
+                perror("Erreur lors de l'écriture dans le fichier");
+            }
+        }
+        chunks = chunks->next;
+    }
+    fclose(file); // Fermer le fichier
 }
 
 // Fonction implémentant la logique pour la sauvegarde d'un fichier
@@ -46,7 +63,7 @@ void backup_file(const char *filename) {
     }
 
     deduplicate_file(file, chunks, hash_table);
-    write_backup_file("./test.txt", chunks,)
+    write_backup_file("./test.bin", chunks,100);
 
     for (size_t i = 0; i < max_chunks; i++) {
         free(chunks[i].data);
