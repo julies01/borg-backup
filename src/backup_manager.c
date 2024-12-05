@@ -28,7 +28,7 @@ void write_backup_file(const char *output_filename, Chunk *chunks, int chunk_cou
     while(chunks->next != NULL){
         if(chunks->data != NULL){
             int size = 4096;
-            size_t written_size = fwrite(chunks->data,size,1,file);
+            size_t written_size = fwrite(chunks->data, sizeof(char), size, file);
             if (written_size != 1) {
                 perror("Erreur lors de l'écriture dans le fichier");
             }

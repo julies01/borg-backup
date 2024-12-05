@@ -55,6 +55,24 @@ int find_md5(Md5Entry **hash_table, unsigned char *md5) {
         return -1;
 }
 
+/**
+ * @brief 
+ * 
+ * @param chunk 
+ * @param md5 
+ * @return Chunk* 
+ */
+Chunk * find_md5_in_Chunk_list(Chunk_list chunk, unsigned char *md5){
+    Chunk *current = chunk;
+    while (current != NULL){
+        if (memcmp(current->md5, md5, MD5_DIGEST_LENGTH) == 0){
+            return current;
+        }
+        current = current->next;
+    }
+    return NULL;
+}
+
 
 /**
  * @brief Fonction pour ajouter un MD5 dans la table de hachage
@@ -196,12 +214,15 @@ void deduplicate_file(FILE *file, Chunk_list chunks, Md5Entry **hash_table){
         if (index == -1){ // Si le chunk n'est pas déjà présent dans la table de hachage 
             index = hash_md5(hash);
             add_md5(hash_table, hash, index); // Ajout du chunk dans la table de hachage
+        }
+        if (find_md5_in_Chunk_list(chunks, hash) == NULL) {
             chunks = add_unique_chunk(chunks, hash, tampon);
-            //see_hash_table(hash_table);
-        }
-        else {
+        } else {
             chunks = add_seen_chunk(chunks, hash);
+                
         }
+
+        
     }
     see_chunk_list(chunks);
     printf("____________________________________________________________________________________\n");
