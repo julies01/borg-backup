@@ -2,6 +2,7 @@
 #include "file_handler.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <openssl/md5.h>
 #include <dirent.h>
@@ -55,24 +56,6 @@ int find_md5(Md5Entry **hash_table, unsigned char *md5) {
         return -1;
 }
 
-/**
- * @brief 
- * 
- * @param chunk 
- * @param md5 
- * @return Chunk* 
- */
-Chunk * find_md5_in_Chunk_list(Chunk_list chunk, unsigned char *md5){
-    Chunk *current = chunk;
-    while (current != NULL){
-        if (memcmp(current->md5, md5, MD5_DIGEST_LENGTH) == 0){
-            return current;
-        }
-        current = current->next;
-    }
-    return NULL;
-}
-
 
 /**
  * @brief Fonction pour ajouter un MD5 dans la table de hachage
@@ -110,9 +93,15 @@ void add_md5(Md5Entry **hash_table, unsigned char *md5, int index) {
  */
 Chunk_list add_unique_chunk(Chunk_list chunk,unsigned char *md5, unsigned char *tampon){
     Chunk *new_el = (Chunk *)malloc(sizeof(Chunk));
+    new_el->is_unique = 0;
     memcpy(new_el->md5, md5, MD5_DIGEST_LENGTH);
     new_el->data = malloc(CHUNK_SIZE);
+    if (new_el->data == NULL) {
+        perror("Impossible d'allouer de la mémoire");
+        exit(EXIT_FAILURE);
+    }
     memcpy(new_el->data, tampon, CHUNK_SIZE);
+    new_el->next = NULL;
 
     Chunk *current = chunk;
     if (current == NULL){
@@ -130,11 +119,21 @@ Chunk_list add_unique_chunk(Chunk_list chunk,unsigned char *md5, unsigned char *
     }
 }
 
-//pas encore vérifié
-Chunk_list add_seen_chunk(Chunk_list chunk, unsigned char *md5){
+/**
+ * @brief Une fonction pour ajouter un chunk déjà répertorié dans la table de hashage, dans le tableau de chunks
+ * 
+ * @param chunk le tableau de chunks
+ * @param md5 la somme MD5 du chunk
+ * @param index l'index du chunk dans le tableau de chunks
+ * @return Chunk_list le tableau de chunks mis à jour
+ */
+Chunk_list add_seen_chunk(Chunk_list chunk, unsigned char *md5,int index){
     Chunk *new_el = (Chunk *)malloc(sizeof(Chunk));
     memcpy(new_el->md5, md5, MD5_DIGEST_LENGTH);
-    new_el->data = NULL;
+    new_el->is_unique = 1;
+    new_el->data = malloc(sizeof(int));
+    memcpy(new_el->data, &index, sizeof(int));
+    new_el->next = NULL;
 
     Chunk *current = chunk;
     if (current == NULL){
@@ -151,6 +150,7 @@ Chunk_list add_seen_chunk(Chunk_list chunk, unsigned char *md5){
         return chunk;
     }
 }
+
 
 /**
  * @brief Fonction pour afficher la table de hachage
@@ -183,18 +183,30 @@ void see_hash_table(Md5Entry **hash_table){
 void see_chunk_list(Chunk_list chunk){
     Chunk *current = chunk;
     while (current != NULL){
-        for (int j = 0; j < MD5_DIGEST_LENGTH; j++){
-            printf("%02x et", current->md5[j]);
-            if (current->data == NULL){
-                printf(" data nulle \n");
+        for (int j = 0; j < MD5_DIGEST_LENGTH; j++) {
+            printf("%02x", current->md5[j]);
+        }
+        if (current->data == NULL){
+            printf(" et fait référence à NULL de la table de hashage\n");
+        } else {
+            if (current->is_unique == 1) {
+                int index;
+                memcpy(&index, current->data, sizeof(int));
+                printf(" et fait référence à %d de la table de hashage\n", index);
+            } else {
+                unsigned char *data_bytes = (unsigned char *)current->data;
+                printf(" les premiers cinq bytes de data : ");
+                for (int k = 0; k < 5; k++) {
+                    printf("%02x", data_bytes[k]);
+                }
+                printf("\n");
             }
-            else
-            printf(" la data à l'adresse : %p\n", current->data);
         }
         printf("\n\n");
         current = current->next;
     }
 }
+
 
 /**
  * @brief Fonction pour convertir un fichier non dédupliqué en tableau de chunks
@@ -214,19 +226,15 @@ void deduplicate_file(FILE *file, Chunk_list chunks, Md5Entry **hash_table){
         if (index == -1){ // Si le chunk n'est pas déjà présent dans la table de hachage 
             index = hash_md5(hash);
             add_md5(hash_table, hash, index); // Ajout du chunk dans la table de hachage
+            chunks = add_unique_chunk(chunks, hash, tampon); // Ajout du chunk dans la liste de chunks
         }
-        if (find_md5_in_Chunk_list(chunks, hash) == NULL) {
-            chunks = add_unique_chunk(chunks, hash, tampon);
-        } else {
-            chunks = add_seen_chunk(chunks, hash);
-                
+         else {
+            chunks = add_seen_chunk(chunks, hash, index); // Ajout du chunk dans la liste de chunks
         }
-
-        
     }
+    see_hash_table(hash_table);
+    printf("____________________________________________________________________________________\n\n");
     see_chunk_list(chunks);
-    printf("____________________________________________________________________________________\n");
-    //see_hash_table(hash_table);
 }
 
 

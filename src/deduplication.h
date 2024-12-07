@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include <openssl/md5.h>
 #include <dirent.h>
 
@@ -17,6 +18,7 @@
 // Structure pour un chunk
 typedef struct Chunk{
     unsigned char md5[MD5_DIGEST_LENGTH]; // MD5 du chunk
+    int is_unique; // 1 si le chunk est unique, 0 sinon
     void *data; // Données du chunk
     struct Chunk *prev; // Pointeur vers le chunk précédent
     struct Chunk *next; // Pointeur vers le prochain chunk
@@ -47,12 +49,25 @@ void see_hash_table(Md5Entry **hash_table);
 // Fonction pour ajouter un chunk unique à la liste de chunks
 Chunk_list add_unique_chunk(Chunk_list chunk,unsigned char *md5, unsigned char *tampon);
 // Fonction pour ajouter un chunk déjà vu à la liste de chunks
-Chunk_list add_seen_chunk(Chunk_list chunk,unsigned char *md5);
+Chunk_list add_seen_chunk(Chunk_list chunk,unsigned char *md5,int index);
 // Fonction pour afficher la liste de chunks
 void see_chunk_list(Chunk_list chunk);
-// Fonction pour convertir un fichier non dédupliqué en tableau de chunks
+
+/**
+ * @brief Fonction pour convertir un fichier non dédupliqué en tableau de chunks
+ * 
+ * @param file le fichier qui sera dédupliqué
+ * @param chunks le tableau de chunks initialisés qui contiendra les chunks issu du fichier
+ * @param hash_table le tableau de hachage qui contient les MD5 et l'index des chunks unique
+ */
 void deduplicate_file(FILE *file, Chunk_list chunks, Md5Entry **hash_table);
-// Fonction permettant de charger un fichier dédupliqué en table de chunks en remplaçant les références par les données correspondantes
-void undeduplicate_file(FILE *file, Chunk_list chunks, int *chunk_count);
+
+/*
+ * @brief Fonction permettant de charger un fichier dédupliqué en table de chunks en remplaçant les références par les données correspondantes
+ * 
+ * @param file le nom du fichier dédupliqué
+ * @param chunks représente le tableau de chunk qui contiendra les chunks restauré depuis filename
+ * @param chunk_count est un compteur du nombre de chunk restauré depuis le fichier filename
+void undeduplicate_file(FILE *file, Chunk_list chunks, int *chunk_count);*/
 
 #endif // DEDUPLICATION_H
