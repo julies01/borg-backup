@@ -1,22 +1,3 @@
-/*                                                                    
-FFFFFFFFFFFFFFFFFFFFFF                    iiii           tttt          
-F::::::::::::::::::::F                   i::::i       ttt:::t          
-F::::::::::::::::::::F                    iiii        t:::::t          
-FF::::::FFFFFFFFF::::F                                t:::::t          
-  F:::::F       FFFFFF  aaaaaaaaaaaaa   iiiiiii ttttttt:::::ttttttt    
-  F:::::F               a::::::::::::a  i:::::i t:::::::::::::::::t    
-  F::::::FFFFFFFFFF     aaaaaaaaa:::::a  i::::i t:::::::::::::::::t    
-  F:::::::::::::::F              a::::a  i::::i tttttt:::::::tttttt    
-  F:::::::::::::::F       aaaaaaa:::::a  i::::i       t:::::t          
-  F::::::FFFFFFFFFF     aa::::::::::::a  i::::i       t:::::t          
-  F:::::F              a::::aaaa::::::a  i::::i       t:::::t          
-  F:::::F             a::::a    a:::::a  i::::i       t:::::t    tttttt
-FF:::::::FF           a::::a    a:::::a i::::::i      t::::::tttt:::::t
-F::::::::FF           a:::::aaaa::::::a i::::::i      tt::::::::::::::t
-F::::::::FF            a::::::::::aa:::ai::::::i        tt:::::::::::tt
-FFFFFFFFFFF             aaaaaaaaaa  aaaaiiiiiiii          ttttttttttt  
-*/
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,13 +15,18 @@ FFFFFFFFFFF             aaaaaaaaaa  aaaaiiiiiiii          ttttttttttt
  * 
  * @param path : chemin absolu ou relatif vers un dossier impérativement
  */
-void list_files(const char *path) {
+char **list_files(const char *path, int *count) {
     struct dirent *dir;
     DIR *d = opendir(path);
+
     if (!d) {
         printf("Le chemin passé en option n'est pas valide !\n");
-        return;
+        *count = 0; // Aucun fichier trouvé
+        return NULL;
     }
+
+    char **file_list = NULL;
+    *count = 0; // Initialisation du compteur de fichiers
 
     while ((dir = readdir(d)) != NULL) {
         // Ignorer les entrées spéciales "." et ".."
@@ -48,11 +34,31 @@ void list_files(const char *path) {
             continue;
         }
 
-        printf("%s\n", dir->d_name);
+        // Allouer de l'espace pour le nouveau fichier
+        file_list = realloc(file_list, (*count + 1) * sizeof(char *));
+        if (!file_list) {
+            printf("Erreur d'allocation mémoire !\n");
+            closedir(d);
+            return NULL;
+        }
+
+        // Allouer de l'espace pour le nom du fichier
+        file_list[*count] = strdup(dir->d_name);
+        if (!file_list[*count]) {
+            printf("Erreur d'allocation mémoire pour le fichier !\n");
+            closedir(d);
+            for (int i = 0; i < *count; i++) {
+                free(file_list[i]);
+            }
+            free(file_list);
+            return NULL;
+        }
+
+        (*count)++; // Augmenter le compteur
     }
 
-    // Fermeture du dossier
-    closedir(d);
+    closedir(d); // Fermer le dossier
+    return file_list; // Retourner le tableau des fichiers
 }
 
 /**
@@ -163,45 +169,81 @@ log_t read_backup_log(const char *logfile){
     fclose(file);
     return logs;
 }
+ 
+/**
+ * @brief Fonction permettant de mettre à jour une ligne du fichier .backup_log dans une structure log_t
+ * 
+ * @param new_line la nouvelle ligne à insérer dans la structure logs au format /chemin/vers/le/fichier,somme_md5,date
+ * @param logs la structure chainée des logs initialisée avec read_backup_log
+ */
+void update_backup_log(const char *new_line, log_t *logs) {
+    if (!new_line || !logs) {
+        fprintf(stderr, "Paramètres invalides pour update_backup_log\n");
+        return;
+    }
 
+    char *new_path = strdup(strtok((char *)new_line, ","));  // Chemin
+    char *new_md5 = strdup(strtok(NULL, ","));              // Somme md5
+    char *new_date = strdup(strtok(NULL, "\n"));            // Date
 
+    if (!new_path || !new_md5 || !new_date) {
+        fprintf(stderr, "Erreur de parsing de la nouvelle ligne\n");
+        free(new_path);
+        free(new_md5);
+        free(new_date);
+        return;
+    }
 
-/*
-EEEEEEEEEEEEEEEEEEEEEE                                                                                                                   
-E::::::::::::::::::::E                                                                                                                   
-E::::::::::::::::::::E                                                                                                                   
-EE::::::EEEEEEEEE::::E                                                                                                                   
-  E:::::E       EEEEEEnnnn  nnnnnnnn             cccccccccccccccc   ooooooooooo   uuuuuu    uuuuuu  rrrrr   rrrrrrrrr       ssssssssss   
-  E:::::E             n:::nn::::::::nn         cc:::::::::::::::c oo:::::::::::oo u::::u    u::::u  r::::rrr:::::::::r    ss::::::::::s  
-  E::::::EEEEEEEEEE   n::::::::::::::nn       c:::::::::::::::::co:::::::::::::::ou::::u    u::::u  r:::::::::::::::::r ss:::::::::::::s 
-  E:::::::::::::::E   nn:::::::::::::::n     c:::::::cccccc:::::co:::::ooooo:::::ou::::u    u::::u  rr::::::rrrrr::::::rs::::::ssss:::::s
-  E:::::::::::::::E     n:::::nnnn:::::n     c::::::c     ccccccco::::o     o::::ou::::u    u::::u   r:::::r     r:::::r s:::::s  ssssss 
-  E::::::EEEEEEEEEE     n::::n    n::::n     c:::::c             o::::o     o::::ou::::u    u::::u   r:::::r     rrrrrrr   s::::::s      
-  E:::::E               n::::n    n::::n     c:::::c             o::::o     o::::ou::::u    u::::u   r:::::r                  s::::::s   
-  E:::::E       EEEEEE  n::::n    n::::n     c::::::c     ccccccco::::o     o::::ou:::::uuuu:::::u   r:::::r            ssssss   s:::::s 
-EE::::::EEEEEEEE:::::E  n::::n    n::::n     c:::::::cccccc:::::co:::::ooooo:::::ou:::::::::::::::uu r:::::r            s:::::ssss::::::s
-E::::::::::::::::::::E  n::::n    n::::n      c:::::::::::::::::co:::::::::::::::o u:::::::::::::::u r:::::r            s::::::::::::::s 
-E::::::::::::::::::::E  n::::n    n::::n       cc:::::::::::::::c oo:::::::::::oo   uu::::::::uu:::u r:::::r             s:::::::::::ss  
-EEEEEEEEEEEEEEEEEEEEEE  nnnnnn    nnnnnn         cccccccccccccccc   ooooooooooo       uuuuuuuu  uuuu rrrrrrr              sssssssssss    
-*/
+    log_element *current = logs->head;
+    while (current) {
+        if (strcmp(current->path, new_path) == 0) {
+            // Mise à jour de l'entrée existante
+            free(current->md5);
+            free(current->date);
+            current->md5 = new_md5;
+            current->date = new_date;
 
+            free(new_path); // `new_path` n'est pas utilisé dans ce cas
+            return;
+        }
+        current = current->next;
+    }
 
+    // Si le chemin n'existe pas encore, ajouter un nouvel élément
+    log_element *new_elt = malloc(sizeof(log_element));
+    if (!new_elt) {
+        perror("Erreur d'allocation mémoire");
+        free(new_path);
+        free(new_md5);
+        free(new_date);
+        return;
+    }
 
+    new_elt->path = new_path;
+    new_elt->md5 = new_md5;
+    new_elt->date = new_date;
 
+    new_elt->next = NULL;
+    new_elt->prev = logs->tail;
 
-// Fonction permettant de mettre à jour une ligne du fichier .backup_log
-void update_backup_log(const char *logfile, log_t *logs){
-  /* Implémenter la logique de modification d'une ligne du fichier ".bakcup_log"
-  * @param: logfile - le chemin vers le fichier .backup_log
-  *         logs - qui est la liste de toutes les lignes du fichier .backup_log sauvegardée dans une structure log_t
-  */
+    if (logs->tail) {
+        logs->tail->next = new_elt;
+    } else {
+        logs->head = new_elt;
+    }
 
+    logs->tail = new_elt;
 }
 
+/**
+ * @brief 
+ * 
+ * @param elt 
+ * @param logfile 
+ */
 void write_log_element(log_element *elt, FILE *logfile){
   /* Implémenter la logique pour écrire un élément log de la liste chaînée log_element dans le fichier .backup_log
    * @param: elt - un élément log à écrire sur une ligne
    *         logfile - le chemin du fichier .backup_log
    */
 }
-

@@ -41,7 +41,7 @@ typedef struct {
     log_element *tail; // Fin de la liste de log
 } log_t;
 
-void list_files(const char *path);
+char **list_files(const char *path, int *count);
 void copy_file(const char *src, const char *dest);
 log_t read_backup_log(const char *logfile);
 
