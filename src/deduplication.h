@@ -60,7 +60,7 @@ void see_chunk_list(Chunk_list chunk);
  * @param chunks le tableau de chunks initialisés qui contiendra les chunks issu du fichier
  * @param hash_table le tableau de hachage qui contient les MD5 et l'index des chunks unique
  */
-void deduplicate_file(FILE *file, Chunk_list chunks, Md5Entry **hash_table);
+void deduplicate_file(FILE *file, Chunk_list *chunks, Md5Entry **hash_table);
 
 /*
  * @brief Fonction permettant de charger un fichier dédupliqué en table de chunks en remplaçant les références par les données correspondantes

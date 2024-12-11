@@ -96,8 +96,7 @@ int main(int argc, char *argv[]) {
     // Implémentation de la logique de sauvegarde et restauration
     // Exemples : gestion des options --backup, --restore, etc.
 	printf("Liste option :\n backup : %d\n restore : %d\n list-backups : %d\n dry-run : %d\n d-server : %s\n d-port : %d\n s-server : %s\n s-port : %d\n destination %s\n source %s\n verbose %d\n",backup,restore,list_back,dry_run,d_server,d_port,s_server,s_port,dest,source,verbose);
-	backup_file(source);
-
+	create_backup(source,dest);
 	
     return EXIT_SUCCESS;
 }

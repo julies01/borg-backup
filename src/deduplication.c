@@ -218,30 +218,29 @@ void see_chunk_list(Chunk_list chunk){
  * @param chunks le tableau de chunks initialisés qui contiendra les chunks issu du fichier
  * @param hash_table le tableau de hachage qui contient les MD5 et l'index des chunks unique
  */
-void deduplicate_file(FILE *file, Chunk_list chunks, Md5Entry **hash_table){
+void deduplicate_file(FILE *file, Chunk_list *chunks, Md5Entry **hash_table) {
     unsigned char tampon[CHUNK_SIZE];
     unsigned char hash[MD5_DIGEST_LENGTH];
     size_t bytes_lus;
     int nb_chunks = 0;
 
-
     while ((bytes_lus = fread(tampon, 1, CHUNK_SIZE, file)) > 0) { // Lecture du fichier en chunks
         compute_md5(tampon, bytes_lus, hash);
         int index = find_md5(hash_table, hash);
-        if (index == -1){ // Si le chunk n'est pas déjà présent dans la table de hachage 
+        if (index == -1) { // Si le chunk n'est pas déjà présent dans la table de hachage 
             index = hash_md5(hash);
             add_md5(hash_table, hash, index); // Ajout du chunk dans la table de hachage
-            chunks = add_unique_chunk(chunks, hash, tampon); // Ajout du chunk dans la liste de chunks
+            *chunks = add_unique_chunk(*chunks, hash, tampon); // Ajout du chunk dans la liste de chunks
             nb_chunks++;
-        }
-         else {
-            chunks = add_seen_chunk(chunks, hash, index); // Ajout du chunk dans la liste de chunks
+        } else {
+            *chunks = add_seen_chunk(*chunks, hash, index); // Ajout du chunk dans la liste de chunks
             nb_chunks++;
         }
     }
+
     see_hash_table(hash_table);
     printf("____________________________________________________________________________________\n\n");
-    see_chunk_list(chunks);
+    see_chunk_list(*chunks);
     printf("____________________________________________________________________________________\n\n");
     printf("Nombre de chunks : %d\n", nb_chunks);
 }

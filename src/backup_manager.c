@@ -7,20 +7,95 @@
 #include <dirent.h>
 #include <time.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/time.h>
+#include <errno.h>
+#include <limits.h> 
 
-// Fonction pour créer une nouvelle sauvegarde complète puis incrémentale
+#define PATH_MAX 4096
+
+void copy_directory(const char *source_dir, const char *dest_dir) {
+    DIR *dir = opendir(source_dir);
+    if (!dir) {
+        perror("Erreur lors de l'ouverture du répertoire source");
+        exit(EXIT_FAILURE);
+    }
+
+    struct dirent *entry;
+    struct stat statbuf;
+
+    mkdir(dest_dir, 0755); // Crée le répertoire de destination s'il n'existe pas
+
+    while ((entry = readdir(dir)) != NULL) {
+        printf("Copie de %s/%s\n", source_dir, entry->d_name);
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+
+        char src_path[PATH_MAX];
+        char dest_path[PATH_MAX];
+        snprintf(src_path, sizeof(src_path), "%s/%s", source_dir, entry->d_name);
+        snprintf(dest_path, sizeof(dest_path), "%s/%s", dest_dir, entry->d_name);
+
+        if (stat(src_path, &statbuf) == -1) {
+            perror("Erreur lors de la récupération des informations sur un fichier");
+            continue;
+        }
+
+        if (S_ISDIR(statbuf.st_mode)) {
+            copy_directory(src_path, dest_path);
+        } else {
+            backup_file(src_path, dest_path);
+        }
+    }
+
+    closedir(dir);
+}
+
+void get_current_timestamp(char *buffer, size_t size) {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+
+    struct tm *local_time = localtime(&tv.tv_sec);
+
+    snprintf(buffer, size, "%04d-%02d-%02d-%02d:%02d:%02d.%03ld",
+             local_time->tm_year + 1900,
+             local_time->tm_mon + 1,
+             local_time->tm_mday,
+             local_time->tm_hour,
+             local_time->tm_min,
+             local_time->tm_sec,
+             tv.tv_usec / 1000);
+}
+
 void create_backup(const char *source_dir, const char *backup_dir) {
-    /* @param: source_dir est le chemin vers le répertoire à sauvegarder
-    *          backup_dir est le chemin vers le répertoire de sauvegarde
-    */
+    // Obtenir la date et l'heure actuelles avec millisecondes
+    char date_str[64];
+    get_current_timestamp(date_str, sizeof(date_str));
+
+    // Construire le chemin complet du nouveau répertoire de sauvegarde
+    char new_backup_dir[PATH_MAX];
+    snprintf(new_backup_dir, sizeof(new_backup_dir), "%s/%s", backup_dir, date_str);
+
+    // Créer le répertoire de sauvegarde
+    if (mkdir(new_backup_dir, 0755) == -1 && errno != EEXIST) {
+        perror("Erreur lors de la création du répertoire de sauvegarde");
+        exit(EXIT_FAILURE);
+    }
+
+    // Copier le contenu du répertoire source dans le nouveau répertoire de sauvegarde
+    copy_directory(source_dir, new_backup_dir);
+
+    printf("Sauvegarde terminée dans : %s\n", new_backup_dir);
 }
 
 // Fonction permettant d'enregistrer dans fichier le tableau de chunk dédupliqué
 void write_backup_file(const char *output_filename, Chunk *chunks, int chunk_count) {
+    printf("Ecriture du fichier de sauvegarde : %s\n", output_filename);
     /*
     */
     // Ouvrir le fichier en mode ajout binaire
-    FILE *file = fopen(output_filename, "wb");
+    FILE *file = fopen(output_filename, "w");
     if (!file) {
         perror("Erreur lors de l'ouverture du fichier");
         return;
@@ -28,49 +103,35 @@ void write_backup_file(const char *output_filename, Chunk *chunks, int chunk_cou
     while(chunks->next != NULL){
         if(chunks->data != NULL){
             int size = 4096;
-            size_t written_size = fwrite(chunks->data, sizeof(char), size, file);
+            size_t written_size = fwrite(chunks->data, size, 1, file);
             if (written_size != 1) {
                 perror("Erreur lors de l'écriture dans le fichier");
             }
+        }else{
         }
         chunks = chunks->next;
     }
     fclose(file); // Fermer le fichier
+    return;
 }
 
 // Fonction implémentant la logique pour la sauvegarde d'un fichier
-void backup_file(const char *filename) {
+void backup_file(const char *filename, const char *backup_dir) {
+    printf("Sauvegarde du fichier : %s\n", filename);
     FILE *file = fopen(filename, "rb");
-    if (!file) {
-        perror("Erreur lors de l'ouverture du fichier");
-        return;
-    }
+   
 
-    Md5Entry *hash_table = malloc(HASH_TABLE_SIZE * sizeof(Md5Entry));
-    if (!hash_table) {
-        fprintf(stderr, "Erreur : allocation mémoire échouée pour la table de hachage.\n");
-        fclose(file);
-        return;
-    }
-
+Md5Entry *hash_table[HASH_TABLE_SIZE] = {0}; // Initialisation de la table de hachage
+   
     size_t max_chunks = 1000;
-    Chunk *chunks = malloc(max_chunks * sizeof(Chunk));
-    if (!chunks) {
-        fprintf(stderr, "Erreur : allocation mémoire échouée pour les chunks.\n");
-        free(hash_table);
-        fclose(file);
-        return;
-    }
+    Chunk_list chunks = NULL;
+   
 
-    deduplicate_file(file, chunks, hash_table);
-    write_backup_file("./test.bin", chunks,100);
+    deduplicate_file(file, &chunks, hash_table);
+    write_backup_file(backup_dir, chunks,100);
 
-    for (size_t i = 0; i < max_chunks; i++) {
-        free(chunks[i].data);
-    }
-    free(chunks);
-    free(hash_table);
     fclose(file);
+    return;
 }
 
 
@@ -134,6 +195,7 @@ void list_backup(const char *directory, int verbose) {
     }
 
     while ((fichier = readdir(dir)) != NULL) {
+        
         if (strcmp(fichier->d_name, ".") == 0 || strcmp(fichier->d_name, "..") == 0) {
             continue;
         }
