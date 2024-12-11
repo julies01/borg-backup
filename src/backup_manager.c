@@ -24,7 +24,7 @@ void copy_directory(const char *source_dir, const char *dest_dir) {
     struct dirent *entry;
     struct stat statbuf;
 
-    mkdir(dest_dir, 0755); // Crée le répertoire de destination s'il n'existe pas
+    mkdir(dest_dir, 0755);
 
     while ((entry = readdir(dir)) != NULL) {
         printf("Copie de %s/%s\n", source_dir, entry->d_name);
@@ -69,21 +69,17 @@ void get_current_timestamp(char *buffer, size_t size) {
 }
 
 void create_backup(const char *source_dir, const char *backup_dir) {
-    // Obtenir la date et l'heure actuelles avec millisecondes
     char date_str[64];
     get_current_timestamp(date_str, sizeof(date_str));
-
-    // Construire le chemin complet du nouveau répertoire de sauvegarde
+    mkdir(backup_dir, 0755);
     char new_backup_dir[PATH_MAX];
     snprintf(new_backup_dir, sizeof(new_backup_dir), "%s/%s", backup_dir, date_str);
 
-    // Créer le répertoire de sauvegarde
     if (mkdir(new_backup_dir, 0755) == -1 && errno != EEXIST) {
         perror("Erreur lors de la création du répertoire de sauvegarde");
         exit(EXIT_FAILURE);
     }
 
-    // Copier le contenu du répertoire source dans le nouveau répertoire de sauvegarde
     copy_directory(source_dir, new_backup_dir);
 
     printf("Sauvegarde terminée dans : %s\n", new_backup_dir);
@@ -91,11 +87,9 @@ void create_backup(const char *source_dir, const char *backup_dir) {
 
 // Fonction permettant d'enregistrer dans fichier le tableau de chunk dédupliqué
 void write_backup_file(const char *output_filename, Chunk *chunks, int chunk_count) {
-    printf("Ecriture du fichier de sauvegarde : %s\n", output_filename);
     /*
     */
-    // Ouvrir le fichier en mode ajout binaire
-    FILE *file = fopen(output_filename, "w");
+    FILE *file = fopen(output_filename, "wb");
     if (!file) {
         perror("Erreur lors de l'ouverture du fichier");
         return;
@@ -111,7 +105,7 @@ void write_backup_file(const char *output_filename, Chunk *chunks, int chunk_cou
         }
         chunks = chunks->next;
     }
-    fclose(file); // Fermer le fichier
+    fclose(file);
     return;
 }
 
@@ -119,13 +113,9 @@ void write_backup_file(const char *output_filename, Chunk *chunks, int chunk_cou
 void backup_file(const char *filename, const char *backup_dir) {
     printf("Sauvegarde du fichier : %s\n", filename);
     FILE *file = fopen(filename, "rb");
-   
-
-Md5Entry *hash_table[HASH_TABLE_SIZE] = {0}; // Initialisation de la table de hachage
-   
+    Md5Entry *hash_table[HASH_TABLE_SIZE] = {0};
     size_t max_chunks = 1000;
     Chunk_list chunks = NULL;
-   
 
     deduplicate_file(file, &chunks, hash_table);
     write_backup_file(backup_dir, chunks,100);
