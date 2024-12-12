@@ -55,26 +55,29 @@ void copy_directory(const char *source_dir, const char *dest_dir) {
 void get_current_timestamp(char *buffer, size_t size) {
     struct timeval tv;
     gettimeofday(&tv, NULL);
-
     struct tm *local_time = localtime(&tv.tv_sec);
-
-    snprintf(buffer, size, "%04d-%02d-%02d-%02d:%02d:%02d.%03ld",
-             local_time->tm_year + 1900,
-             local_time->tm_mon + 1,
-             local_time->tm_mday,
-             local_time->tm_hour,
-             local_time->tm_min,
-             local_time->tm_sec,
-             tv.tv_usec / 1000);
+    char temp_buffer[64];
+    strftime(temp_buffer, sizeof(temp_buffer), "%Y-%m-%d-%H:%M:%S", local_time);
+    snprintf(buffer, size, "%s.%03ld", temp_buffer, tv.tv_usec / 1000);
 }
 
 void create_backup(const char *source_dir, const char *backup_dir) {
     char date_str[64];
+    char fichierlog[128];
     get_current_timestamp(date_str, sizeof(date_str));
     mkdir(backup_dir, 0755);
     char new_backup_dir[PATH_MAX];
     snprintf(new_backup_dir, sizeof(new_backup_dir), "%s/%s", backup_dir, date_str);
-
+    strcat(fichierlog, backup_dir);
+    strcat(fichierlog, "/");
+    strcat(fichierlog, ".backup_log");
+    FILE *log = fopen(fichierlog, "r");
+    if(log == NULL){
+        log = fopen(fichierlog, "w");
+        printf("Erreur lors de l'ouverture du fichier de log");
+        fclose(log);
+        return;
+    }
     if (mkdir(new_backup_dir, 0755) == -1 && errno != EEXIST) {
         perror("Erreur lors de la création du répertoire de sauvegarde");
         exit(EXIT_FAILURE);
