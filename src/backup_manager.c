@@ -14,6 +14,12 @@
 
 #define PATH_MAX 4096
 
+/**
+ * @brief Une procédure permettant de copier un répertoire
+ * 
+ * @param source_dir Le chemin du répertoire source
+ * @param dest_dir Le chemin du répertoire de destination
+ */
 void copy_directory(const char *source_dir, const char *dest_dir) {
     DIR *dir = opendir(source_dir);
     if (!dir) {
@@ -24,7 +30,7 @@ void copy_directory(const char *source_dir, const char *dest_dir) {
     struct dirent *entry;
     struct stat statbuf;
 
-    mkdir(dest_dir, 0755);
+    mkdir(dest_dir, 0755); // Création du répertoire de destination avec les permissions en octale
 
     while ((entry = readdir(dir)) != NULL) {
         printf("Copie de %s/%s\n", source_dir, entry->d_name);
@@ -52,6 +58,12 @@ void copy_directory(const char *source_dir, const char *dest_dir) {
     closedir(dir);
 }
 
+/**
+ * @brief Une procédure permettant obtenir le timestamp actuel
+ * 
+ * @param buffer le tampon pour stocker le timestamp
+ * @param size la taille du tampon
+ */
 void get_current_timestamp(char *buffer, size_t size) {
     struct timeval tv;
     gettimeofday(&tv, NULL);
@@ -61,6 +73,12 @@ void get_current_timestamp(char *buffer, size_t size) {
     snprintf(buffer, size, "%s.%03ld", temp_buffer, tv.tv_usec / 1000);
 }
 
+/**
+ * @brief Une procédure pour créer un nouveau backup incrémental
+ * 
+ * @param source_dir le répertoire source
+ * @param backup_dir le répertoire de destination
+ */
 void create_backup(const char *source_dir, const char *backup_dir) {
     char date_str[64];
     char fichierlog[128];
@@ -88,7 +106,14 @@ void create_backup(const char *source_dir, const char *backup_dir) {
     printf("Sauvegarde terminée dans : %s\n", new_backup_dir);
 }
 
-// Fonction permettant d'enregistrer dans fichier le tableau de chunk dédupliqué
+/**
+ * @brief Une procédure permettant d'enregistrer dans fichier le tableau de chunk dédupliqué
+
+ * 
+ * @param output_filename le fichier de sortie
+ * @param chunks le tableau de chunks
+ * @param chunk_count le nombre de chunks contenus dans le tableau
+ */
 void write_backup_file(const char *output_filename, Chunk *chunks, int chunk_count) {
     /*
     */
@@ -104,7 +129,6 @@ void write_backup_file(const char *output_filename, Chunk *chunks, int chunk_cou
             if (written_size != 1) {
                 perror("Erreur lors de l'écriture dans le fichier");
             }
-        }else{
         }
         chunks = chunks->next;
     }
@@ -112,7 +136,12 @@ void write_backup_file(const char *output_filename, Chunk *chunks, int chunk_cou
     return;
 }
 
-// Fonction implémentant la logique pour la sauvegarde d'un fichier
+/**
+ * @brief Une procédure implémentant la logique pour la sauvegarde d'un fichier
+ * 
+ * @param filename le nom du fichier à traiter
+ * @param backup_dir le chemin du répertoire de sauvegarde
+ */
 void backup_file(const char *filename, const char *backup_dir) {
     printf("Sauvegarde du fichier : %s\n", filename);
     FILE *file = fopen(filename, "rb");
@@ -128,7 +157,13 @@ void backup_file(const char *filename, const char *backup_dir) {
 }
 
 
-// Fonction permettant la restauration du fichier backup via le tableau de chunk
+/** 
+ * @brief Une procédure permettant la restauration du fichier backup via le tableau de chunk
+ * 
+ * @param output_filename fichier de sortie avec les chunks restorés
+ * @param chunks tableau de chunks
+ * @param chunk_count nombre de chunks contenus dans le tableau
+ */
 void write_restored_file(const char *output_filename, Chunk *chunks, int chunk_count) {
     FILE *dest = fopen(output_filename, "wb");
     if (!dest){
@@ -137,7 +172,7 @@ void write_restored_file(const char *output_filename, Chunk *chunks, int chunk_c
     }
     for (int i = 0; i < chunk_count && chunks != NULL; i++, chunks = chunks->next) {
         if (chunks->data != NULL){
-            size_t written_size = fwrite(chunks->data, chunks->size, 1, dest);
+            size_t written_size = fwrite(chunks->data, CHUNK_SIZE, 1, dest);
             if (written_size != 1) {
                 fprintf(stderr, "erreur : ecriture incomplète dans %s : %s\n", output_filename, strerror(errno));
                 fclose(dest);
@@ -150,14 +185,22 @@ void write_restored_file(const char *output_filename, Chunk *chunks, int chunk_c
 }
         
     
-
-// Fonction pour restaurer une sauvegarde
+/**
+ * @brief Une procédure qui permet de restaurer la dernière sauvegarde
+ * 
+ * @param backup_id le chemin vers le répertoire de la sauvegarde que l'on veut restaurer
+ * @param restore_dir le répertoire de destination de la restauration
+ */
 void restore_backup(const char *backup_id, const char *restore_dir) {
-    /* @param: backup_id est le chemin vers le répertoire de la sauvegarde que l'on veut restaurer
-    *          restore_dir est le répertoire de destination de la restauration
-    */
+    
 }
 
+/**
+ * @brief Une fonction qui calcule la taille d'un répertoire
+ * 
+ * @param directory le répertoire dont on veut connaître la taille/l'existence
+ * @return entier, -1 si le répertoire n'existe pas, la taille du répertoire sinon
+ */
 int taille_dossier(const char *directory) {
     int total_size = 0;
     struct dirent *fichier;
@@ -195,6 +238,12 @@ int taille_dossier(const char *directory) {
     return total_size;
 } 
 
+/**
+ * @brief Une procédure permettant de lister des informations sur des répertoires
+ * 
+ * @param directory le chemin du répertoire que l'on souhaite traiter
+ * @param verbose mode verbose activé ou non
+ */
 void list_backup(const char *directory, int verbose) {
     struct dirent *fichier;
     DIR *dir = opendir(directory);
