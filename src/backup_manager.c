@@ -112,9 +112,8 @@ void create_backup(const char *source_dir, const char *backup_dir) {
  * 
  * @param output_filename le fichier de sortie
  * @param chunks le tableau de chunks
- * @param chunk_count le nombre de chunks contenus dans le tableau
  */
-void write_backup_file(const char *output_filename, Chunk *chunks, int chunk_count) {
+void write_backup_file(const char *output_filename, Chunk *chunks) {
     /*
     */
     FILE *file = fopen(output_filename, "wb");
@@ -150,7 +149,7 @@ void backup_file(const char *filename, const char *backup_dir) {
     Chunk_list chunks = NULL;
 
     deduplicate_file(file, &chunks, hash_table);
-    write_backup_file(backup_dir, chunks,100);
+    write_backup_file(backup_dir, chunks);
 
     fclose(file);
     return;
