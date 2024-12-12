@@ -171,9 +171,11 @@ log_t read_backup_log(const char *logfile){
 }
  
 /**
- * @brief Fonction permettant de mettre à jour une ligne du fichier .backup_log dans une structure log_t
+ * @brief Fonction ajoutant une ligne à une structure log_t 
+ *          ouverte avec un fichier .backup_log 
  * 
- * @param new_line la nouvelle ligne à insérer dans la structure logs au format /chemin/vers/le/fichier,somme_md5,date
+ * @param new_line la nouvelle ligne à insérer dans la structure logs au 
+ *          format /chemin/vers/le/fichier,somme_md5,date
  * @param logs la structure chainée des logs initialisée avec read_backup_log
  */
 void update_backup_log(const char *new_line, log_t *logs) {
@@ -183,11 +185,11 @@ void update_backup_log(const char *new_line, log_t *logs) {
     }
 
     char *new_path = strdup(strtok((char *)new_line, ","));  // Chemin
-    char *new_md5 = strdup(strtok(NULL, ","));              // Somme md5
-    char *new_date = strdup(strtok(NULL, "\n"));            // Date
+    char *new_md5 = strdup(strtok(NULL, ","));               // Somme md5
+    char *new_date = strdup(strtok(NULL, "\n"));             // Date
 
     if (!new_path || !new_md5 || !new_date) {
-        fprintf(stderr, "Erreur de parsing de la nouvelle ligne\n");
+        fprintf(stderr, "Erreur en découpant la nouvelle ligne\n");
         free(new_path);
         free(new_md5);
         free(new_date);
@@ -197,7 +199,7 @@ void update_backup_log(const char *new_line, log_t *logs) {
     log_element *current = logs->head;
     while (current) {
         if (strcmp(current->path, new_path) == 0) {
-            // Mise à jour de l'entrée existante
+            // Mise à jour de l'entrée existante, pas besoin de créer une nouvelle ligne
             free(current->md5);
             free(current->date);
             current->md5 = new_md5;
@@ -236,14 +238,20 @@ void update_backup_log(const char *new_line, log_t *logs) {
 }
 
 /**
- * @brief 
+ * @brief Fonction qui prend un element d'une liste chainée de type log_t et qui 
+ *          l'écrit dans le fichier logfile (.backup_log)
  * 
- * @param elt 
- * @param logfile 
+ * @param elt un élément log_element à écrire sur une ligne
+ * @param logfile le chemin du fichier .backup_log
  */
-void write_log_element(log_element *elt, FILE *logfile){
-  /* Implémenter la logique pour écrire un élément log de la liste chaînée log_element dans le fichier .backup_log
-   * @param: elt - un élément log à écrire sur une ligne
-   *         logfile - le chemin du fichier .backup_log
-   */
+void write_log_element(log_element *elt, FILE *logfile) {
+    if (!elt || !logfile) {
+        fprintf(stderr, "Paramètres invalides pour write_log_element\n");
+        return;
+    }
+
+    // Écriture des données au format spécifié : chemin,somme_md5,date\n
+    if (fprintf(logfile, "%s,%s,%s\n", elt->path, elt->md5, elt->date) < 0) {
+        perror("Erreur lors de l'écriture dans le fichier");
+    }
 }
