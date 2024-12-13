@@ -11,50 +11,138 @@
 #include <sys/time.h>
 #include <errno.h>
 #include <limits.h> 
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/sendfile.h>
 
 #define PATH_MAX 4096
 
+int parse_directory_name(const char *dir_name, struct tm *tm) {
+    return sscanf(dir_name, "%4d-%2d-%2d-%2d:%2d:%2d",
+                  &tm->tm_year, &tm->tm_mon, &tm->tm_mday,
+                  &tm->tm_hour, &tm->tm_min, &tm->tm_sec) == 6;
+}
+
+double time_diff(struct tm *tm1, struct tm *tm2) {
+    time_t t1 = mktime(tm1);
+    time_t t2 = mktime(tm2);
+    return difftime(t1, t2);
+}
+
+char* find_closest_backup(const char *backup_dir) {
+    DIR *dir;
+    struct dirent *entry;
+    struct tm current_tm, entry_tm;
+    struct timeval tv;
+    double min_diff = -1;
+    char *closest_dir = NULL;
+    gettimeofday(&tv, NULL);
+    localtime_r(&tv.tv_sec, &current_tm);
+    dir = opendir(backup_dir);
+    if (!dir) {
+        perror("opendir");
+        return NULL;
+    }
+
+    while ((entry = readdir(dir)) != NULL) {
+        struct stat entry_stat;
+        char entry_path[PATH_MAX];
+        snprintf(entry_path, sizeof(entry_path), "%s/%s", backup_dir, entry->d_name);
+        if (stat(entry_path, &entry_stat) == 0 && S_ISDIR(entry_stat.st_mode) &&
+            parse_directory_name(entry->d_name, &entry_tm)) {
+            double diff = fabs(time_diff(&current_tm, &entry_tm));
+            if (min_diff == -1 || diff < min_diff) {
+                min_diff = diff;
+                if (closest_dir) {
+                    free(closest_dir);
+                }
+                closest_dir = strdup(entry->d_name);
+            }
+        }
+    }
+
+    closedir(dir);
+    return closest_dir;
+}
+
+void copy_file_link(const char *source, const char *destination) {
+    int source_fd, dest_fd;
+    struct stat stat_buf;
+    off_t offset = 0;
+    source_fd = open(source, O_RDONLY);
+    if (source_fd == -1) {
+        perror("open source");
+        exit(EXIT_FAILURE);
+    }
+    if (fstat(source_fd, &stat_buf) == -1) {
+        perror("fstat");
+        close(source_fd);
+        exit(EXIT_FAILURE);
+    }
+    dest_fd = open(destination, O_WRONLY | O_CREAT | O_TRUNC, stat_buf.st_mode);
+    if (dest_fd == -1) {
+        perror("open destination");
+        close(source_fd);
+        exit(EXIT_FAILURE);
+    }
+    if (sendfile(dest_fd, source_fd, &offset, stat_buf.st_size) == -1) {
+        perror("sendfile");
+        close(source_fd);
+        close(dest_fd);
+        exit(EXIT_FAILURE);
+    }
+    close(source_fd);
+    close(dest_fd);
+}
+
 /**
- * @brief Une procédure permettant de copier un répertoire
+ * @brief Une procédure permettant de copier un répertoire avec les liens dur
  * 
  * @param source_dir Le chemin du répertoire source
  * @param dest_dir Le chemin du répertoire de destination
  */
-void copy_directory(const char *source_dir, const char *dest_dir) {
-    DIR *dir = opendir(source_dir);
-    if (!dir) {
-        perror("Erreur lors de l'ouverture du répertoire source");
+void copy_directory(const char *source, const char *destination) {
+    DIR *dir;
+    struct dirent *entry;
+    char source_path[PATH_MAX];
+    char dest_path[PATH_MAX];
+    struct stat stat_buf;
+    if (mkdir(destination, 0755) == -1 && errno != EEXIST) {
+        perror("mkdir");
         exit(EXIT_FAILURE);
     }
-
-    struct dirent *entry;
-    struct stat statbuf;
-
-    mkdir(dest_dir, 0755); // Création du répertoire de destination avec les permissions en octale
-
+    dir = opendir(source);
+    if (!dir) {
+        perror("opendir");
+        exit(EXIT_FAILURE);
+    }
     while ((entry = readdir(dir)) != NULL) {
-        printf("Copie de %s/%s\n", source_dir, entry->d_name);
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
             continue;
         }
 
-        char src_path[PATH_MAX];
-        char dest_path[PATH_MAX];
-        snprintf(src_path, sizeof(src_path), "%s/%s", source_dir, entry->d_name);
-        snprintf(dest_path, sizeof(dest_path), "%s/%s", dest_dir, entry->d_name);
+        snprintf(source_path, PATH_MAX, "%s/%s", source, entry->d_name);
+        snprintf(dest_path, PATH_MAX, "%s/%s", destination, entry->d_name);
 
-        if (stat(src_path, &statbuf) == -1) {
-            perror("Erreur lors de la récupération des informations sur un fichier");
+        if (stat(source_path, &stat_buf) == -1) {
+            perror("stat");
             continue;
         }
 
-        if (S_ISDIR(statbuf.st_mode)) {
-            copy_directory(src_path, dest_path);
+        if (S_ISDIR(stat_buf.st_mode)) {
+            copy_directory(source_path, dest_path);
         } else {
-            backup_file(src_path, dest_path);
+            copy_file(source_path, dest_path);
+            if (unlink(source_path) == -1) {
+                perror("unlink");
+                exit(EXIT_FAILURE);
+            }
+            if (link(dest_path, source_path) == -1) {
+                perror("link");
+                exit(EXIT_FAILURE);
+            }
         }
     }
-
     closedir(dir);
 }
 
@@ -92,16 +180,20 @@ void create_backup(const char *source_dir, const char *backup_dir) {
     FILE *log = fopen(fichierlog, "r");
     if(log == NULL){
         log = fopen(fichierlog, "w");
+    }else{
         printf("Erreur lors de l'ouverture du fichier de log");
-        fclose(log);
+        const char *backup_dir2 = "./test";
+        char *closest_backup = find_closest_backup(backup_dir2);
+        strcat(backup_dir, closest_backup);
+        printf("Restauration de la sauvegarde la plus proche : %s\n", fichierlog);
+        copy_directory(backup_dir, new_backup_dir);
         return;
     }
     if (mkdir(new_backup_dir, 0755) == -1 && errno != EEXIST) {
         perror("Erreur lors de la création du répertoire de sauvegarde");
         exit(EXIT_FAILURE);
     }
-
-    copy_directory(source_dir, new_backup_dir);
+    fclose(log);
 
     printf("Sauvegarde terminée dans : %s\n", new_backup_dir);
 }
