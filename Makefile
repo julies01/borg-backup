@@ -2,7 +2,7 @@
 CC = gcc
 
 # Options de compilation
-CFLAGS = -Wall -Wextra -I./src -pedantic -std=c11 -O2 -g -Wno-deprecated-declarations
+CFLAGS = -Wall -Wextra -I./src -pedantic -O2 -g -Wno-deprecated-declarations
 
 # Bibliothèque Openssl
 LDFLAGS = -lssl -lcrypto

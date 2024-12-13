@@ -28,8 +28,8 @@ FFFFFFFFFFF             aaaaaaaaaa  aaaaiiiiiiii          ttttttttttt
 
 // Structure pour une ligne du fichier log
 typedef struct log_element {
-    const char *path; // Chemin du fichier/dossier
-    const char *md5; // MD5 du fichier dédupliqué, le considérer comme une chaine de caracter est suffisant
+    char *path; // Chemin du fichier/dossier
+    char *md5; // MD5 du fichier dédupliqué, le considérer comme une chaine de caracter est suffisant
     char *date; // Date de dernière modification
     struct log_element *next;
     struct log_element *prev;
