@@ -145,9 +145,8 @@ void copy_file(const char *src, const char *dest) {
  * @param logfile chemin absolu ou relatif vers le fichier .backup_log
  * @return log_t liste doublement chainée avec les données lues dans le fichier
  */
-log_t read_backup_log(const char *logfile){
+log_t read_backup_log(FILE *file){
     log_t logs = { .head = NULL, .tail = NULL };
-    FILE *file = fopen(logfile, "r");
     if (!file) {
         perror("Erreur lors de l'ouverture du fichier .backup_log");
         return logs;
@@ -179,7 +178,7 @@ log_t read_backup_log(const char *logfile){
 
     fclose(file);
     if (verbose) {
-        printf("Lecture du fichier de log %s terminée avec succès.\n", logfile);
+        printf("Lecture du fichier de log terminée avec succès.\n");
         log_element *current = logs.head;
         while (current) {
             printf("Chemin: %s, MD5: %s, Date: %s\n", current->path, current->md5, current->date);
