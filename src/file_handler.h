@@ -24,7 +24,7 @@ typedef struct {
 
 char **list_files(const char *path, int *count);
 void copy_file(const char *src, const char *dest);
-log_t read_backup_log(FILE *file);
+void read_backup_log(FILE *file, log_t *logs);
 void update_backup_log(const char *logfile, log_t *logs);
 void write_log_element(log_element *elt, FILE *logfile);
 

@@ -145,15 +145,15 @@ void copy_file(const char *src, const char *dest) {
  * @param logfile chemin absolu ou relatif vers le fichier .backup_log
  * @return log_t liste doublement chainée avec les données lues dans le fichier
  */
-log_t read_backup_log(FILE *file){
-    log_t logs = { .head = NULL, .tail = NULL };
+void read_backup_log(FILE *file, log_t *logs) {
     if (!file) {
-        perror("Erreur lors de l'ouverture du fichier .backup_log");
-        return logs;
+        perror("Erreur lors de l'ouverture du fichier de log");
+        return;
     }
+    rewind(file);
 
-    char line[1024];
-    while (fgets(line, sizeof(line), file)) {
+    char line[256];
+     while (fgets(line, sizeof(line), file)) {
         log_element *elt = malloc(sizeof(log_element));
         if (!elt) {
             perror("Erreur d'allocation mémoire");
@@ -166,26 +166,15 @@ log_t read_backup_log(FILE *file){
         elt->date = strdup(strtok(NULL, "\n"));  // Date
 
         elt->next = NULL;
-        elt->prev = logs.tail;
+        elt->prev = logs->tail;
 
-        if (logs.tail) {
-            logs.tail->next = elt;
+        if (logs->tail) {
+            logs->tail->next = elt;
         } else {
-            logs.head = elt;
+            logs->head = elt;
         }
-        logs.tail = elt;
+        logs->tail = elt;
     }
-
-    fclose(file);
-    if (verbose) {
-        printf("Lecture du fichier de log terminée avec succès.\n");
-        log_element *current = logs.head;
-        while (current) {
-            printf("Chemin: %s, MD5: %s, Date: %s\n", current->path, current->md5, current->date);
-            current = current->next;
-        }
-    }
-    return logs;
 }
  
 /**

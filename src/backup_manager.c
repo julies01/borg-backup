@@ -289,12 +289,14 @@ void copy_directory(const char *source_dir, const char *dest_dir, FILE *log,int 
             }
         }else{
             log_t *logs = malloc(sizeof(log_t));
-            read_backup_log(logs);
+            read_backup_log(log, logs);
             log_element *current = logs->head;
-            while(current!=NULL){
-                printf("%s",current->path);
-                current = current->next;
+            while (current != NULL)
+            {
+                printf("Restauration de %s\n", current->path);
+                char *path = current->path;
             }
+            
         }
     }
 
@@ -338,6 +340,7 @@ void create_backup(const char *source_dir, const char *backup_dir) {
         printf("Copie des fichier de : %s dans : %s\n", source_dir, new_backup_dir);
         copy_directory(source_dir, new_backup_dir, log, 1);
     }else{
+        log = fopen(fichierlog, "a+");
         char *closest_backup = find_most_recent_folder(backup_dir);
         strcat(backup_dir, "/");
         strcat(backup_dir, closest_backup);
