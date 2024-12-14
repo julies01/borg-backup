@@ -312,20 +312,71 @@ void write_restored_file(const char *output_filename, Chunk *chunks, int chunk_c
 
     fclose(dest);
 }
-        
-    
+
 /**
- * @brief Une procédure qui permet de restaurer la dernière sauvegarde
+ * @brief Procédure  qui restaure une sauvegarde
  * 
- * @param backup_id le chemin vers le répertoire de la sauvegarde que l'on veut restaurer
- * @param restore_dir le répertoire de destination de la restauration
+ * @param backup_id chemin vers de répertoire de la sauvegarde que l'on veut restaurer
+ * @param restore_dir répertoire ou sera restaurée la sauvegarde
  */
 void restore_backup(const char *backup_id, const char *restore_dir) {
-    
+    DIR *dir;
+    struct dirent *entry;
+    char backup_path[PATH_MAX];
+    char restore_path[PATH_MAX];
+    struct stat st;
+
+    dir = opendir(backup_id);
+    if (!dir) {
+        fprintf(stderr, "Erreur : impossible d'ouvrir le répertoire de sauvegarde %s : %s\n", backup_id, strerror(errno));
+        return;
+    }
+
+    while ((entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+
+        snprintf(backup_path, sizeof(backup_path), "%s/%s", backup_id, entry->d_name);
+        snprintf(restore_path, sizeof(restore_path), "%s/%s", restore_dir, entry->d_name);
+
+        if (stat(backup_path, &st) == -1) {
+            fprintf(stderr, "Erreur : impossible de récupérer les informations du fichier %s : %s\n", backup_path, strerror(errno));
+            continue;
+        }
+
+        if (S_ISDIR(st.st_mode)) {
+            mkdir(restore_path, 0755);
+            restore_backup(backup_path, restore_path);
+        } else if (S_ISREG(st.st_mode)) {
+            int src_fd = open(backup_path, O_RDONLY);
+            if (src_fd == -1) {
+                fprintf(stderr, "Erreur : impossible d'ouvrir le fichier source %s : %s\n", backup_path, strerror(errno));
+                continue;
+            }
+
+            int dest_fd = open(restore_path, O_WRONLY | O_CREAT | O_TRUNC, st.st_mode);
+            if (dest_fd == -1) {
+                fprintf(stderr, "Erreur : impossible de créer le fichier de destination %s : %s\n", restore_path, strerror(errno));
+                close(src_fd);
+                continue;
+            }
+
+            off_t offset = 0;
+            if (sendfile(dest_fd, src_fd, &offset, st.st_size) == -1) {
+                fprintf(stderr, "Erreur : échec de la copie du fichier %s vers %s : %s\n", backup_path, restore_path, strerror(errno));
+            }
+
+            close(src_fd);
+            close(dest_fd);
+        }
+    }
+
+    closedir(dir);
 }
 
 /**
- * @brief Une fonction qui calcule la taille d'un répertoire
+ * @brief Fonction qui calcule la taille d'un répertoire
  * 
  * @param directory le répertoire dont on veut connaître la taille/l'existence
  * @return entier, -1 si le répertoire n'existe pas, la taille du répertoire sinon
@@ -368,9 +419,10 @@ int taille_dossier(const char *directory) {
 } 
 
 /**
- * @brief Une procédure permettant de lister des informations sur des répertoires
+ * @brief Procédure listant les sauvegardes dans un répertoire, et
+ *          donnant des info sur chaque sauvegarde (chaque sous répertoire dans ce répertoire enfaite)
  * 
- * @param directory le chemin du répertoire que l'on souhaite traiter
+ * @param directory chemin vers le répertoire avec les sauvegardes
  * @param verbose mode verbose activé ou non
  */
 void list_backup(const char *directory, int verbose) {

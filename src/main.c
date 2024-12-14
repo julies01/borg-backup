@@ -81,30 +81,30 @@ int main(int argc, char *argv[]) {
 				exit(EXIT_FAILURE);
 		}
 	}
-    // Implémentation de la logique de sauvegarde et restauration
-    // Exemples : gestion des options --backup, --restore, etc.
+
+    // Gestion des options
 	printf("Liste option :\n backup : %d\n restore : %d\n list-backups : %d\n dry-run : %d\n d-server : %s\n d-port : %d\n s-server : %s\n s-port : %d\n destination %s\n source %s\n verbose %d\n",backup,restore,list_back,dry_run,d_server,d_port,s_server,s_port,dest,source,verbose);
-	if(backup+restore+list_back > 1){
+	if (backup+restore+list_back > 1) {
 		fprintf(stderr, "Erreur : plusieurs options choisies\n");
 		exit(EXIT_FAILURE);
-	}else if(backup == 1){
-		if(source != NULL && dest != NULL){
-			create_backup(source,dest);
-		}else{
+	} else if(backup == 1) {
+		if (source != NULL && dest != NULL) {
+			create_backup(source, dest);
+		} else {
 			fprintf(stderr, "Erreur : source ou/et destination non spécifiées\n");
 			exit(EXIT_FAILURE);
 		}
-	}else if(restore == 1){
-		if(source != NULL && dest != NULL){
-			restore_backup(source,dest);
-		}else{
+	} else if (restore == 1) {
+		if (source != NULL && dest != NULL) {
+			restore_backup(source, dest);
+		} else {
 			fprintf(stderr, "Erreur : source ou/et destination non spécifiées\n");
 			exit(EXIT_FAILURE);
 		}
-	}else if(list_back == 1){
-		if(dest != NULL){
-			list_backup(dest,verbose);
-		}else{
+	} else if (list_back == 1) {
+		if (dest != NULL) {
+			list_backup(dest, verbose);
+		} else {
 			fprintf(stderr, "Erreur : destination non spécifiée\n");
 			exit(EXIT_FAILURE);
 		}
