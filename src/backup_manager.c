@@ -17,52 +17,56 @@
 
 #define PATH_MAX 4096
 
-int parse_directory_name(const char *dir_name, struct tm *tm) {
-    return sscanf(dir_name, "%4d-%2d-%2d-%2d:%2d:%2d",
-                  &tm->tm_year, &tm->tm_mon, &tm->tm_mday,
-                  &tm->tm_hour, &tm->tm_min, &tm->tm_sec) == 6;
+// Fonction pour convertir un nom de dossier en structure tm (date)
+int parse_folder_date(const char *folder_name, struct tm *result) {
+    return sscanf(folder_name, "%4d-%2d-%2d-%2d:%2d:%2d.%3d",
+                  &result->tm_year, &result->tm_mon, &result->tm_mday,
+                  &result->tm_hour, &result->tm_min, &result->tm_sec, &(int){0}) == 7;
 }
 
-double time_diff(struct tm *tm1, struct tm *tm2) {
-    time_t t1 = mktime(tm1);
-    time_t t2 = mktime(tm2);
-    return difftime(t1, t2);
-}
-
-char* find_closest_backup(const char *backup_dir) {
-    DIR *dir;
-    struct dirent *entry;
-    struct tm current_tm, entry_tm;
-    struct timeval tv;
-    double min_diff = -1;
-    char *closest_dir = NULL;
-    gettimeofday(&tv, NULL);
-    localtime_r(&tv.tv_sec, &current_tm);
-    dir = opendir(backup_dir);
+// Fonction principale
+char *find_most_recent_folder(const char *base_path) {
+    DIR *dir = opendir(base_path);
     if (!dir) {
-        perror("opendir");
+        perror("Impossible d'ouvrir le répertoire");
         return NULL;
     }
 
+    struct dirent *entry;
+    struct tm most_recent_tm = {0};
+    char *most_recent_folder = NULL;
+
     while ((entry = readdir(dir)) != NULL) {
-        struct stat entry_stat;
-        char entry_path[PATH_MAX];
-        snprintf(entry_path, sizeof(entry_path), "%s/%s", backup_dir, entry->d_name);
-        if (stat(entry_path, &entry_stat) == 0 && S_ISDIR(entry_stat.st_mode) &&
-            parse_directory_name(entry->d_name, &entry_tm)) {
-            double diff = fabs(time_diff(&current_tm, &entry_tm));
-            if (min_diff == -1 || diff < min_diff) {
-                min_diff = diff;
-                if (closest_dir) {
-                    free(closest_dir);
+        // Ignore les dossiers "." et ".."
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+
+        // Vérifie si c'est un dossier
+        char path[1024];
+        snprintf(path, sizeof(path), "%s/%s", base_path, entry->d_name);
+
+        struct stat statbuf;
+        if (stat(path, &statbuf) == 0 && S_ISDIR(statbuf.st_mode)) {
+            struct tm folder_tm = {0};
+            if (parse_folder_date(entry->d_name, &folder_tm)) {
+                folder_tm.tm_year -= 1900; // tm_year est compté depuis 1900
+                folder_tm.tm_mon -= 1;    // tm_mon est compté de 0 à 11
+
+                // Comparer la date actuelle avec la plus récente
+                time_t folder_time = mktime(&folder_tm);
+                time_t most_recent_time = mktime(&most_recent_tm);
+                if (most_recent_folder == NULL || difftime(folder_time, most_recent_time) > 0) {
+                    free(most_recent_folder); // Libère la mémoire de la précédente si nécessaire
+                    most_recent_folder = strdup(entry->d_name);
+                    most_recent_tm = folder_tm;
                 }
-                closest_dir = strdup(entry->d_name);
             }
         }
     }
 
     closedir(dir);
-    return closest_dir;
+    return most_recent_folder;
 }
 
 void copy_file_link(const char *source, const char *destination) {
@@ -214,16 +218,17 @@ void create_backup(const char *source_dir, const char *backup_dir) {
     snprintf(new_backup_dir, sizeof(new_backup_dir), "%s/%s", backup_dir, date_str);
     strcat(fichierlog, backup_dir);
     strcat(fichierlog, "/");
-    strcat(fichierlog, ".backup_log");
+    strcat(fichierlog, "backup_log");
     FILE *log = fopen(fichierlog, "r");
     if(log == NULL){
         log = fopen(fichierlog, "w");
         printf("Copie des fichier de : %s dans : %s\n", source_dir, new_backup_dir);
         copy_directory(source_dir, new_backup_dir);
     }else{
-        char *closest_backup = find_closest_backup(backup_dir);
+        char *closest_backup = find_most_recent_folder(backup_dir);
+        strcat(backup_dir, "/");
         strcat(backup_dir, closest_backup);
-        printf("Restauration de la sauvegarde la plus proche : %s\n", fichierlog);
+        printf("Restauration de la sauvegarde la plus proche : %s\n", closest_backup);
         copy_directory_link(backup_dir, new_backup_dir);
         return;
     }
