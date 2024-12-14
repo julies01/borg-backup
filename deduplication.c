@@ -28,8 +28,11 @@ unsigned int hash_md5(unsigned char *md5) {
  * @param md5_out la somme MD5 du chunk en sortie
  */
 void compute_md5(void *data, size_t len, unsigned char *md5_out) {
-    MD5(data, len, md5_out);// Fonction de la librairie openssl qui permet de calculer le MD5 d'un chunk
-
+    if (md5_out == NULL) {
+        fprintf(stderr, "md5_out buffer is not allocated\n");
+        exit(EXIT_FAILURE);
+    }
+    MD5(data, len, md5_out); // Fonction de la librairie openssl qui permet de calculer le MD5 d'un chunk
 }
 
 
@@ -260,34 +263,36 @@ void deduplicate_file(FILE *file, Chunk_list *chunks, Md5Entry **hash_table) {
         }
     }
 
-    see_hash_table(hash_table);
+    /*see_hash_table(hash_table);
     printf("____________________________________________________________________________________\n\n");
     see_chunk_list(*chunks);
-    printf("____________________________________________________________________________________\n\n");
+    printf("____________________________________________________________________________________\n\n");*/
     printf("Nombre de chunks : %d\n", nb_chunks);
 }
 
-int extract_first_number(const char *identificator) {
-    // Extract the first number inside parentheses
-    const char *start = strchr(identificator, '(');
+
+int extract_second_number(const char *identificator) {
+    const char *start = strstr(identificator, "[*(");
     int number;
-    sscanf(start + 1, "%d", &number);
+    sscanf(start + 3, "%d", &number);
     return number;
 }
 
-int read_identificator(const char *identificator) {
-    const char *first_star = strchr(identificator, '*');
-    if (first_star != NULL) {
-        const char *second_star = strchr(first_star + 1, '*');
-        if (second_star != NULL) {
-            char second_temp[second_star - first_star]; // Adjusted size
-            strncpy(second_temp, first_star + 1, second_star - first_star - 1);
-            second_temp[second_star - first_star - 1] = '\0'; // Ensure null termination
-            return atoi(second_temp);
-        }
+void find_data_in_chunklist(Chunk_list chunk, int index, void **data) {
+    Chunk *current = chunk;
+    int compteur = 1;
+    while (compteur != index){
+        compteur++;
+        current = current->next;
     }
-    return -1;
+    if (current->data == NULL){
+        printf("Erreur, il n'y a pas de data\n");
+    } else {
+        *data = current->data;
+    }
 }
+
+
 
 /**
  * @brief Fonction permettant de charger un fichier dédupliqué en table de chunks en remplaçant les références par les données correspondantes
@@ -296,36 +301,44 @@ int read_identificator(const char *identificator) {
  * @param chunks représente le tableau de chunk qui contiendra les chunks restauré depuis filename
  * @param chunk_count est un compteur du nombre de chunk restauré depuis le fichier filename
  */
-/*void undeduplicate_file(FILE *file, Chunk *chunks) {
+
+void undeduplicate_file(FILE *file, Chunk_list *chunks) {
     unsigned char hash[MD5_DIGEST_LENGTH];
     unsigned char tampon[CHUNK_SIZE];
+    char *line = (char*)malloc(30 * sizeof(char));
+    if (line == NULL) {
+        fprintf(stderr, "Memory allocation failed for line\n");
+        return;
+    }
     size_t bytes_lus;
 
-    while ((bytes_lus = fread(hash, 1, MD5_DIGEST_LENGTH, file)) > 0) { 
-    Chunk *current = chunks;
-    int chunk_index = 1;
-    while (current != NULL) {
-        if (memcmp(current->md5, hash, MD5_DIGEST_LENGTH) == 0) {
-        if (current->is_unique == 0) {
-            fwrite(current->data, 1, CHUNK_SIZE, file);
-        } else {
-            int ref_index;
-            memcpy(&ref_index, current->data, sizeof(int));
-            Chunk *ref_chunk = chunks;
-            for (int i = 1; i < ref_index; i++) {
-            ref_chunk = ref_chunk->next;
+    fseek(file, 0, SEEK_SET);
+
+    while (!feof(file)) {
+        if (fgets(line, 30, file) != NULL) {
+            if (strstr(line, "!/(") != NULL) { // Si la ligne contient un identificateur
+                int index = extract_second_number(line);
+                if (index != 0) { // Si le chunk contient une référence à un autre chunk
+                    void *data = NULL;
+                    find_data_in_chunklist(*chunks, index, &data);
+                    if (data == NULL) {
+                        fprintf(stderr, "Data not found for index %d\n", index);
+                        continue;
+                    }
+                    compute_md5(data, CHUNK_SIZE, hash);
+                    *chunks = add_unique_chunk(*chunks, hash, data);
+                } else {
+                    bytes_lus = fread(tampon, 1, CHUNK_SIZE, file);
+                    if (bytes_lus > 0) {
+                        compute_md5(tampon, bytes_lus, hash);
+                        *chunks = add_unique_chunk(*chunks, hash, tampon);
+                    } else {
+                        fprintf(stderr, "Failed to read chunk from file\n");
+                    }
+                }
             }
-            fwrite(ref_chunk->data, 1, CHUNK_SIZE, file);
         }
-        break;
-        }
-        current = current->next;
-        chunk_index++;
     }
+
+    free(line);
 }
-    }
-
-       
-   
-}*/
-

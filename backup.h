@@ -10,13 +10,13 @@
 #include <sys/stat.h>
 
 // Fonction permettant la restauration du fichier backup via le tableau de chunk
-void write_backup_file(const char *output_filename, Chunk *chunks);
+void write_backup_file(const char *output_filename, Chunk_list chunks);
 
 // Fonction permettant la restauration du fichier backup via le tableau de chunk
-void write_restored_file(const char *output_filename, Chunk *chunks, int chunk_count);
+void write_restored_file(const char *output_filename, Chunk_list chunks);
 
+// Fonction pour la sauvegarde de fichier dédupliqué
 void backup_file(const char *filename, const char *backup_dir);
 
-void restore_file(const char *filename, const char *backup_dir);
 
 #endif // BACKUP_H

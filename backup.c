@@ -21,7 +21,7 @@
  * @param output_filename le fichier de sortie
  * @param chunks le tableau de chunks
  */
-void write_backup_file(const char *output_filename, Chunk *chunks) {
+void write_backup_file(const char *output_filename, Chunk_list chunks) {
     FILE *file = fopen(output_filename, "wb");
     if (!file) {
         perror("Erreur lors de l'ouverture du fichier");
@@ -94,33 +94,25 @@ void backup_file(const char *filename, const char *backup_dir) {
  * @param chunks tableau de chunks
  * @param chunk_count nombre de chunks contenus dans le tableau
  */
-void write_restored_file(const char *output_filename, Chunk *chunks, int chunk_count) {
+void write_restored_file(const char *output_filename, Chunk_list chunks) {
     FILE *dest = fopen(output_filename, "wb");
     if (!dest){
         fprintf(stderr, "erreur : impossible de créer le fichier %s : %s\n", output_filename, strerror(errno));
         return;
     }
-    for (int i = 0; i < chunk_count && chunks != NULL; i++, chunks = chunks->next) {
-        if (chunks->data != NULL){
-            size_t written_size = fwrite(chunks->data, CHUNK_SIZE, 1, dest);
-            if (written_size != 1) {
-                fprintf(stderr, "erreur : ecriture incomplète dans %s : %s\n", output_filename, strerror(errno));
-                fclose(dest);
-                return;
+    Chunk *current = chunks;
+    while (current != NULL){
+        if (current->data == NULL){
+            printf("Erreur, il n'y a pas de data\n");
+        } else {
+            size_t data = fwrite(current->data, CHUNK_SIZE, 1, dest);
+            if (data != 1) {
+                perror("Erreur lors de l'écriture de la data dans le fichier");
             }
         }
+        current = current->next;
     }
-
     fclose(dest);
 }
         
     
-/**
- * @brief Une procédure qui permet de restaurer la dernière sauvegarde
- * 
- * @param backup_id le chemin vers le répertoire de la sauvegarde que l'on veut restaurer
- * @param restore_dir le répertoire de destination de la restauration
- */
-void restore_backup(const char *backup_id, const char *restore_dir) {
-    
-}
