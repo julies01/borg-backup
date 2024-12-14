@@ -203,8 +203,8 @@ void update_backup_log(const char *new_line, log_t *logs) {
         return;
     }
 
-    char *new_path = strdup(strtok((char *)new_line, ","));  // Chemin
-    char *new_md5 = strdup(strtok(NULL, ","));               // Somme md5
+    char *new_path = strdup(strtok((char *)new_line, ";"));  // Chemin
+    char *new_md5 = strdup(strtok(NULL, ";"));               // Somme md5
     char *new_date = strdup(strtok(NULL, "\n"));             // Date
 
     if (!new_path || !new_md5 || !new_date) {
@@ -273,7 +273,7 @@ void write_log_element(log_element *elt, FILE *logfile) {
     }
 
     // Écriture des données au format spécifié : chemin,somme_md5,date\n
-    if (fprintf(logfile, "%s,%s,%s\n", elt->path, elt->md5, elt->date) < 0) {
+    if (fprintf(logfile, "%s;%s;%s\n", elt->path, elt->md5, elt->date) < 0) {
         perror("Erreur lors de l'écriture dans le fichier");
     }
 

@@ -14,8 +14,99 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/sendfile.h>
+#include <regex.h>
+#include <openssl/md5.h>
 
 #define PATH_MAX 4096
+
+void get_current_datetime(char *buffer, size_t buffer_size) {
+    struct timeval tv;
+    struct tm *tm_info;
+
+    // Obtenir l'heure actuelle avec précision jusqu'aux millisecondes
+    gettimeofday(&tv, NULL);
+    tm_info = localtime(&tv.tv_sec);
+
+    // Écrire la date et l'heure au format "YYYY-MM-DD-hh:mm:ss.sss"
+    snprintf(buffer, buffer_size, "%04d-%02d-%02d-%02d:%02d:%02d.%03ld",
+             tm_info->tm_year + 1900, // Année
+             tm_info->tm_mon + 1,    // Mois (de 0 à 11)
+             tm_info->tm_mday,       // Jour du mois
+             tm_info->tm_hour,       // Heure
+             tm_info->tm_min,        // Minute
+             tm_info->tm_sec,        // Seconde
+             tv.tv_usec / 1000);     // Millisecondes (µsecondes converties)
+}
+
+char *calculate_md5(const char *filename) {
+    FILE *file = fopen(filename, "rb");
+    if (!file) {
+        perror("Erreur lors de l'ouverture du fichier");
+        return NULL;
+    }
+
+    MD5_CTX md5_ctx;
+    unsigned char data[1024];
+    unsigned char hash[MD5_DIGEST_LENGTH];
+    char *md5_string = malloc(MD5_DIGEST_LENGTH * 2 + 1); // 2 caractères par octet + 1 pour '\0'
+
+    if (!md5_string) {
+        fprintf(stderr, "Erreur d'allocation mémoire\n");
+        fclose(file);
+        return NULL;
+    }
+
+    MD5_Init(&md5_ctx);
+
+    // Lecture du fichier par blocs et mise à jour du calcul MD5
+    size_t bytes_read;
+    while ((bytes_read = fread(data, 1, sizeof(data), file)) > 0) {
+        MD5_Update(&md5_ctx, data, bytes_read);
+    }
+
+    if (ferror(file)) {
+        perror("Erreur lors de la lecture du fichier");
+        free(md5_string);
+        fclose(file);
+        return NULL;
+    }
+
+    MD5_Final(hash, &md5_ctx);
+    fclose(file);
+
+    // Convertir le hash en une chaîne hexadécimale
+    for (int i = 0; i < MD5_DIGEST_LENGTH; i++) {
+        sprintf(&md5_string[i * 2], "%02x", hash[i]);
+    }
+
+    return md5_string;
+}
+
+char *extract_from_date(const char *path) {
+    const char *pattern = "[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}";
+    regex_t regex;
+    regmatch_t match;
+
+    // Compile le pattern
+    if (regcomp(&regex, pattern, REG_EXTENDED) != 0) {
+        fprintf(stderr, "Erreur : Impossible de compiler l'expression régulière.\n");
+        return NULL;
+    }
+
+    // Cherche le pattern dans le chemin
+    if (regexec(&regex, path, 1, &match, 0) == 0) {
+        // Trouve la position du début de la date
+        size_t start = match.rm_so;
+        // Alloue la mémoire pour le résultat
+        char *result = strdup(path + start);
+        regfree(&regex); // Libère la mémoire du regex
+        return result;
+    }
+
+    // Si aucun match n'est trouvé
+    regfree(&regex);
+    return NULL;
+}
 
 // Fonction pour convertir un nom de dossier en structure tm (date)
 int parse_folder_date(const char *folder_name, struct tm *result) {
@@ -24,7 +115,6 @@ int parse_folder_date(const char *folder_name, struct tm *result) {
                   &result->tm_hour, &result->tm_min, &result->tm_sec, &(int){0}) == 7;
 }
 
-// Fonction principale
 char *find_most_recent_folder(const char *base_path) {
     DIR *dir = opendir(base_path);
     if (!dir) {
@@ -150,7 +240,7 @@ void copy_directory_link(const char *source, const char *destination) {
     closedir(dir);
 }
 
-void copy_directory(const char *source_dir, const char *dest_dir) {
+void copy_directory(const char *source_dir, const char *dest_dir, FILE *log) {
     DIR *dir = opendir(source_dir);
     if (!dir) {
         perror("Erreur lors de l'ouverture du répertoire source");
@@ -163,23 +253,36 @@ void copy_directory(const char *source_dir, const char *dest_dir) {
     mkdir(dest_dir, 0755);
 
     while ((entry = readdir(dir)) != NULL) {
-        printf("Copie de %s/%s\n", source_dir, entry->d_name);
+        printf("Copie de %s/%s\n", dest_dir, entry->d_name);
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
             continue;
         }
-
         char src_path[PATH_MAX];
         char dest_path[PATH_MAX];
         snprintf(src_path, sizeof(src_path), "%s/%s", source_dir, entry->d_name);
         snprintf(dest_path, sizeof(dest_path), "%s/%s", dest_dir, entry->d_name);
-
+        printf("Copie de %s vers %s\n", src_path, dest_path);
+        log_element *elem = malloc(sizeof(log_element));
+        if (1) {
+            char date[64];
+            get_current_datetime(date, sizeof(date));
+            char *chemin_date = extract_from_date(dest_path);
+            printf("Date : %s\n", chemin_date);
+            elem->path = chemin_date;
+            elem->date = date;
+            elem->md5 = calculate_md5(src_path);
+            write_log_element(elem,log);
+        } else {
+            printf("Aucune date trouvée dans le chemin.\n");
+            return;
+        }
         if (stat(src_path, &statbuf) == -1) {
             perror("Erreur lors de la récupération des informations sur un fichier");
             continue;
         }
 
         if (S_ISDIR(statbuf.st_mode)) {
-            copy_directory(src_path, dest_path);
+            copy_directory(src_path, dest_path, log);
         } else {
             backup_file(src_path, dest_path);
         }
@@ -218,12 +321,12 @@ void create_backup(const char *source_dir, const char *backup_dir) {
     snprintf(new_backup_dir, sizeof(new_backup_dir), "%s/%s", backup_dir, date_str);
     strcat(fichierlog, backup_dir);
     strcat(fichierlog, "/");
-    strcat(fichierlog, "backup_log");
+    strcat(fichierlog, ".backup_log");
     FILE *log = fopen(fichierlog, "r");
     if(log == NULL){
-        log = fopen(fichierlog, "w");
+        log = fopen(fichierlog, "a");
         printf("Copie des fichier de : %s dans : %s\n", source_dir, new_backup_dir);
-        copy_directory(source_dir, new_backup_dir);
+        copy_directory(source_dir, new_backup_dir, log);
     }else{
         char *closest_backup = find_most_recent_folder(backup_dir);
         strcat(backup_dir, "/");
