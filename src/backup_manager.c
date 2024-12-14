@@ -20,6 +20,7 @@
 
 #define PATH_MAX 4096
 
+<<<<<<< HEAD
 int file_exists_in_directory(const char *file_path, const char *directory) {
     DIR *dir;
     struct dirent *entry;
@@ -172,12 +173,39 @@ char *extract_from_date(const char *path) {
 }
 
 // Fonction pour convertir un nom de dossier en structure tm (date)
+=======
+/**
+ * @brief Fonction pour convertir un nom de dossier en structure tm (date)
+ * 
+ * Cette fonction prend un nom de dossier au format "YYYY-MM-DD-HH:MM:SS.mmm" et le convertit en une structure tm.
+ * 
+ * @param folder_name Le nom du dossier à convertir
+ * @param result Pointeur vers la structure tm où la date sera stockée
+ * @return int Retourne 1 si la conversion a réussi, 0 sinon
+ */
+>>>>>>> 9b97eb8 (complétion du make pour éviter les warning inutiles au sujet du fait que md5 n'est plus sécurisée, finition de déduplication (reste à faire undeduplicate mais a voir avec le format de fichier créé par la sauvegarde), relecture rapide de backupmanager)
 int parse_folder_date(const char *folder_name, struct tm *result) {
     return sscanf(folder_name, "%4d-%2d-%2d-%2d:%2d:%2d.%3d",
                   &result->tm_year, &result->tm_mon, &result->tm_mday,
                   &result->tm_hour, &result->tm_min, &result->tm_sec, &(int){0}) == 7;
 }
 
+<<<<<<< HEAD
+=======
+/**
+ * @brief Trouve le dossier le plus récent dans un répertoire donné.
+ * 
+ * Cette fonction parcourt tous les sous-dossiers d'un répertoire spécifié et
+ * identifie celui dont le nom représente la date la plus récente. Le format
+ * attendu pour les noms de dossiers est "YYYY-MM-DD-HH:MM:SS.mmm".
+ * 
+ * @param base_path Le chemin du répertoire de base où chercher les dossiers.
+ * @return Un pointeur vers une chaîne de caractères contenant le nom du dossier
+ *         le plus récent, ou NULL si une erreur survient ou si aucun dossier
+ *         valide n'est trouvé. La mémoire allouée pour cette chaîne doit être
+ *         libérée par l'appelant.
+ */
+>>>>>>> 9b97eb8 (complétion du make pour éviter les warning inutiles au sujet du fait que md5 n'est plus sécurisée, finition de déduplication (reste à faire undeduplicate mais a voir avec le format de fichier créé par la sauvegarde), relecture rapide de backupmanager)
 char *find_most_recent_folder(const char *base_path) {
     DIR *dir = opendir(base_path);
     if (!dir) {
@@ -222,6 +250,18 @@ char *find_most_recent_folder(const char *base_path) {
     return most_recent_folder;
 }
 
+/**
+ * @brief Copie le contenu d'un fichier source vers un fichier de destination en utilisant des liens.
+ * 
+ * Cette fonction ouvre le fichier source en lecture seule et le fichier de destination en écriture.
+ * Elle utilise ensuite la fonction `sendfile` pour transférer le contenu du fichier source vers le fichier de destination.
+ * 
+ * @param source Chemin du fichier source à copier.
+ * @param destination Chemin du fichier de destination où le contenu sera copié.
+ * 
+ * @note En cas d'erreur lors de l'ouverture des fichiers ou de la copie, la fonction affiche un message d'erreur
+ *       et termine le programme avec `exit(EXIT_FAILURE)`.
+ */
 void copy_file_link(const char *source, const char *destination) {
     int source_fd, dest_fd;
     struct stat stat_buf;
@@ -303,7 +343,21 @@ void copy_directory_link(const char *source, const char *destination) {
     closedir(dir);
 }
 
+<<<<<<< HEAD
 void copy_directory(const char *source_dir, const char *dest_dir, FILE *log,int new) {
+=======
+/**
+ * @brief Copie un répertoire source vers un répertoire de destination.
+ *
+ * Cette fonction parcourt le répertoire source et copie chaque fichier et sous-répertoire
+ * dans le répertoire de destination. Si un élément est un sous-répertoire, la fonction
+ * est appelée récursivement pour copier son contenu.
+ *
+ * @param source_dir Le chemin du répertoire source à copier.
+ * @param dest_dir Le chemin du répertoire de destination où copier le contenu.
+ */
+void copy_directory(const char *source_dir, const char *dest_dir) {
+>>>>>>> 9b97eb8 (complétion du make pour éviter les warning inutiles au sujet du fait que md5 n'est plus sécurisée, finition de déduplication (reste à faire undeduplicate mais a voir avec le format de fichier créé par la sauvegarde), relecture rapide de backupmanager)
     DIR *dir = opendir(source_dir);
     if (!dir) {
         perror("Erreur lors de l'ouverture du répertoire source");
@@ -414,7 +468,7 @@ void get_current_timestamp(char *buffer, size_t size) {
  */
 void create_backup(const char *source_dir, const char *backup_dir) {
     char date_str[64];
-    char fichierlog[128];
+    char fichierlog[128] = {0};
     get_current_timestamp(date_str, sizeof(date_str));
     mkdir(backup_dir, 0755);
     char new_backup_dir[PATH_MAX];
@@ -424,17 +478,29 @@ void create_backup(const char *source_dir, const char *backup_dir) {
     strcat(fichierlog, ".backup_log");
     FILE *log = fopen(fichierlog, "r");
     if(log == NULL){
+<<<<<<< HEAD
         log = fopen(fichierlog, "a");
         printf("Copie des fichier de : %s dans : %s\n", source_dir, new_backup_dir);
         copy_directory(source_dir, new_backup_dir, log, 1);
+=======
+        log = fopen(fichierlog, "w");
+        printf("Copie des fichiers de : %s dans : %s\n", source_dir, new_backup_dir);
+        copy_directory(source_dir, new_backup_dir);
+>>>>>>> 9b97eb8 (complétion du make pour éviter les warning inutiles au sujet du fait que md5 n'est plus sécurisée, finition de déduplication (reste à faire undeduplicate mais a voir avec le format de fichier créé par la sauvegarde), relecture rapide de backupmanager)
     }else{
         log = fopen(fichierlog, "a+");
         char *closest_backup = find_most_recent_folder(backup_dir);
-        strcat(backup_dir, "/");
-        strcat(backup_dir, closest_backup);
+        char closest_backup_path[PATH_MAX];
+        snprintf(closest_backup_path, sizeof(closest_backup_path), "%s/%s", backup_dir, closest_backup);
         printf("Restauration de la sauvegarde la plus proche : %s\n", closest_backup);
+<<<<<<< HEAD
         copy_directory_link(backup_dir, new_backup_dir);
         copy_directory(source_dir, new_backup_dir, log, 0);
+=======
+        copy_directory_link(closest_backup_path, new_backup_dir);
+        free(closest_backup);
+        fclose(log);
+>>>>>>> 9b97eb8 (complétion du make pour éviter les warning inutiles au sujet du fait que md5 n'est plus sécurisée, finition de déduplication (reste à faire undeduplicate mais a voir avec le format de fichier créé par la sauvegarde), relecture rapide de backupmanager)
         return;
     }
     if (mkdir(new_backup_dir, 0755) == -1 && errno != EEXIST) {
@@ -453,12 +519,18 @@ void create_backup(const char *source_dir, const char *backup_dir) {
  * @param output_filename le fichier de sortie
  * @param chunks le tableau de chunks
  */
+<<<<<<< HEAD
 void write_backup_file(const char *output_filename, Chunk_list chunks) {
     FILE *file = fopen(output_filename, "wb");//Ouverture du fichier en écriture binaire
+=======
+void write_backup_file(const char *output_filename, Chunk *chunks) {
+    FILE *file = fopen(output_filename, "wb");
+>>>>>>> 9b97eb8 (complétion du make pour éviter les warning inutiles au sujet du fait que md5 n'est plus sécurisée, finition de déduplication (reste à faire undeduplicate mais a voir avec le format de fichier créé par la sauvegarde), relecture rapide de backupmanager)
     if (!file) {
         perror("Erreur lors de l'ouverture du fichier");
         return;
     }
+<<<<<<< HEAD
     Chunk *current = chunks;
     int chunk_count = 0;
     while(current != NULL){ //tant que le chunk courant n'est pas NULL (on est pas arrivés au bout de la liste chaînée)
@@ -490,13 +562,20 @@ void write_backup_file(const char *output_filename, Chunk_list chunks) {
                 if (data != 1) {// Gestion d'erreurs
                     perror("Erreur lors de l'écriture de la data dans le fichier");
                 }
+=======
+    while(chunks != NULL){
+        if(chunks->data != NULL){
+            int size = 4096;
+            size_t written_size = fwrite(chunks->data, size, 1, file);
+            if (written_size != 1) {
+                perror("Erreur lors de l'écriture dans le fichier");
+>>>>>>> 9b97eb8 (complétion du make pour éviter les warning inutiles au sujet du fait que md5 n'est plus sécurisée, finition de déduplication (reste à faire undeduplicate mais a voir avec le format de fichier créé par la sauvegarde), relecture rapide de backupmanager)
             }
         }
         fwrite("\n", sizeof(char), 1, file);
         current = current->next;//On passe au chunk suivant
     }
     fclose(file);
-    return;
 }
 
 /**
@@ -507,17 +586,25 @@ void write_backup_file(const char *output_filename, Chunk_list chunks) {
  */
 void backup_file(const char *filename, const char *backup_dir) {
     printf("Sauvegarde du fichier : %s\n", filename);
+<<<<<<< HEAD
     FILE *file = fopen(filename, "rb"); // Ouverture du fichier en lecture binaire
     Md5Entry *hash_table[HASH_TABLE_SIZE] = {NULL}; // Initialisation de la table de hachage
     Chunk_list chunks = NULL; // Initialisation de la liste de chunks
+=======
+    FILE *file = fopen(filename, "rb");
+    if (!file) {
+        perror("Erreur lors de l'ouverture du fichier");
+        return;
+    }
+    Md5Entry *hash_table[HASH_TABLE_SIZE] = {0};
+    Chunk_list chunks = NULL;
+>>>>>>> 9b97eb8 (complétion du make pour éviter les warning inutiles au sujet du fait que md5 n'est plus sécurisée, finition de déduplication (reste à faire undeduplicate mais a voir avec le format de fichier créé par la sauvegarde), relecture rapide de backupmanager)
 
     deduplicate_file(file, &chunks, hash_table);
     write_backup_file(backup_dir, chunks);
 
     fclose(file);
-    return;
 }
-
 
 /** 
  * @brief Une procédure permettant la restauration du fichier backup via le tableau de chunk
@@ -621,7 +708,7 @@ int taille_dossier(const char *directory) {
     DIR *dir = opendir(directory);
 
     if (!dir) {
-        printf("Le répertoire n'éxiste pas");
+        printf("Le répertoire n'existe pas");
         return -1;
     }
 
@@ -664,7 +751,7 @@ void list_backup(const char *directory, int verbose) {
     DIR *dir = opendir(directory);
 
     if (!dir) {
-        printf("Le répertoire n'éxiste pas");
+        printf("Le répertoire n'existe pas");
         return;
     }
 

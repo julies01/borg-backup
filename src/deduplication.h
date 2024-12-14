@@ -52,6 +52,7 @@ Chunk_list add_unique_chunk(Chunk_list chunk,unsigned char *md5, unsigned char *
 Chunk_list add_seen_chunk(Chunk_list chunk,unsigned char *md5,int index);
 // Fonction pour afficher la liste de chunks
 void see_chunk_list(Chunk_list chunk);
+<<<<<<< HEAD
 //Fonction pour lire un identificateur et retourner l'index
 int read_identificator(const char *identificator);
 //Fonction 
@@ -76,5 +77,12 @@ void deduplicate_file(FILE *file, Chunk_list *chunks, Md5Entry **hash_table);
  * @param chunks représente le tableau de chunk qui contiendra les chunks restauré depuis filename
  * @param chunk_count est un compteur du nombre de chunk restauré depuis le fichier filename*/
 void undeduplicate_file(FILE *file, Chunk_list *chunks);
+=======
+// Fonction pour convertir un fichier non dédupliqué en tableau de chunks
+void deduplicate_file(FILE *file, Chunk_list *chunks, Md5Entry **hash_table);
+// Fonction permettant de charger un fichier dédupliqué en table de chunks
+// en remplaçant les références par les données correspondantes
+void undeduplicate_file(FILE *file, Chunk_list *chunks, int *chunk_count, Md5Entry **hash_table);
+>>>>>>> 9b97eb8 (complétion du make pour éviter les warning inutiles au sujet du fait que md5 n'est plus sécurisée, finition de déduplication (reste à faire undeduplicate mais a voir avec le format de fichier créé par la sauvegarde), relecture rapide de backupmanager)
 
 #endif // DEDUPLICATION_H

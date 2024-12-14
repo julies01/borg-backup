@@ -5,7 +5,12 @@ CC = gcc
 CFLAGS = -Wall -Wextra -I./src -pedantic -O2 -g -Wno-deprecated-declarations
 
 # Bibliothèque Openssl
-LDFLAGS = -lssl -lcrypto
+LDFLAGS = -lssl -lcrypto -Wno-deprecated-declarations
+# Ce dernier flag permet de ne pas mettre de warn pour les fonctions dépréciées, la fonction
+# MD5 n'étant plus sécurisée. Cependant, cette approche n'est viable à long terme, car les fonctions
+# dépréciées pourraient être complètement supprimées dans de futures versions d'OpenSSL.
+
+
 
 # Liste des fichiers sources
 SRC = src/main.c src/file_handler.c src/deduplication.c src/backup_manager.c
