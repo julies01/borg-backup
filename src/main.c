@@ -7,18 +7,6 @@
 #include "backup_manager.h"
 #include "network.h"
 
-char *strdup(const char *s) {
-    if (s == NULL) {
-        return NULL;
-    }
-    char *copy = (char *)malloc(strlen(s) + 1);
-    if (copy == NULL) {
-        return NULL;
-    }
-    strcpy(copy, s);
-    return copy;
-}
-
 int main(int argc, char *argv[]) {
     // Analyse des arguments de la ligne de commande
 	int opt = 0;
