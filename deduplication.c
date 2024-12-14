@@ -53,9 +53,8 @@ int find_md5(Md5Entry **hash_table, unsigned char *md5) {
             }
             current = current->next;
         }
-        i++;
     }
-        return -1;
+    return -1;
 }
 
 
@@ -262,11 +261,6 @@ void deduplicate_file(FILE *file, Chunk_list *chunks, Md5Entry **hash_table) {
             nb_chunks++;
         }
     }
-
-    /*see_hash_table(hash_table);
-    printf("____________________________________________________________________________________\n\n");
-    see_chunk_list(*chunks);
-    printf("____________________________________________________________________________________\n\n");*/
     printf("Nombre de chunks : %d\n", nb_chunks);
 }
 

@@ -80,6 +80,8 @@ void backup_file(const char *filename, const char *backup_dir) {
     Chunk_list chunks = NULL;
 
     deduplicate_file(file, &chunks, hash_table);
+    see_hash_table(hash_table);
+    see_chunk_list(chunks);
     write_backup_file(backup_dir, chunks);
 
     fclose(file);

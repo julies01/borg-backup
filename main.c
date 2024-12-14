@@ -6,10 +6,11 @@
 #include "backup.h"
 
 int main(){
-    const char *filename = "image.jpg";
-    const char *backup_dir = "image_petite.jpg";
+    const char *filename = "file_1.txt";
+    const char *backup_dir = "file_petit.txt";
     backup_file(filename, backup_dir);
-    Chunk_list chunks = NULL;
+
+    /*Chunk_list chunks = NULL;
     FILE * file = fopen(backup_dir,"rb");
     if (file == NULL) {
         perror("Erreur lors de l'ouverture du fichier");
@@ -17,7 +18,7 @@ int main(){
     }
     undeduplicate_file(file,&chunks);
     see_chunk_list(chunks);
-    write_restored_file("image_restauree.jpg",chunks);
+    write_restored_file("image_restauree.jpg",chunks);*/
 
     /*int index_test_1;
     int index_test_2;
