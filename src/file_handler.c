@@ -179,7 +179,11 @@ log_t read_backup_log(FILE *file) {
         elem->next = logs.head;
         logs.head = elem;
     }
-
+    log_element *elem = logs.head;
+    while (elem->next != NULL) {
+        elem = elem->next;
+    }
+    logs.tail = elem;
     return logs;
 }
  

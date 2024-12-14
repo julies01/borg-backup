@@ -20,6 +20,23 @@
 
 #define PATH_MAX 4096
 
+void add_log_element(log_t *logs, log_element *elem) {
+    printf("Ajout de l'élément %s\n", elem->path);
+    if (logs->tail == NULL) {
+        // La liste est vide, initialiser head et tail
+        logs->head = elem;
+        logs->tail = elem;
+        elem->prev = NULL;
+        elem->next = NULL;
+    } else {
+        // Ajouter l'élément à la fin de la liste
+        elem->prev = logs->tail;
+        elem->next = NULL;
+        logs->tail->next = elem;
+        logs->tail = elem;
+    }
+}
+
 int file_exists_in_directory(const char *file_path, const char *directory) {
     DIR *dir;
     struct dirent *entry;
@@ -303,7 +320,7 @@ void copy_directory_link(const char *source, const char *destination) {
     closedir(dir);
 }
 
-void copy_directory(const char *source_dir, const char *dest_dir, FILE *log,int new) {
+void copy_directory(const char *source_dir, const char *dest_dir, FILE *log, int new) {
     DIR *dir = opendir(source_dir);
     if (!dir) {
         perror("Erreur lors de l'ouverture du répertoire source");
@@ -366,11 +383,11 @@ void copy_directory(const char *source_dir, const char *dest_dir, FILE *log,int 
                     char *test = extract_from_date(dest_path);
                     printf("Date : %s\n", test);
                     elem = file_exists_in_log(test, logs);
-                    char *md5_1=calculate_md5(src_path);
+                    char *md5=calculate_md5(src_path);
                     if(elem==NULL){
                         printf("Le fichier %s n'est pas présent dans %s\n", src_path, dest_dir);
                     }else{
-                        if(strcmp(md5_1,elem->md5)==0){
+                        if(strcmp(md5,elem->md5)==0){
                             char *chemin_date = extract_from_date(dest_path);
                             elem->path = chemin_date;
                         }else{
@@ -380,10 +397,25 @@ void copy_directory(const char *source_dir, const char *dest_dir, FILE *log,int 
                             char *chemin_date = extract_from_date(dest_path);
                             elem->path = chemin_date;
                             elem->date = date;
-                            elem->md5 = md5_1;
+                            elem->md5 = md5;
                             backup_file(src_path, dest_path);
                         }
                     }
+                }else{
+                    printf("Le fichier %s n'est pas présent dans %s\n", src_path, dest_dir);
+                    log_element *elem = malloc(sizeof(log_element));
+                    elem->prev = logs->tail;
+                    elem->next = NULL;
+                    logs->tail->next = elem;
+                    logs->tail = elem;
+                    char date[64];
+                    get_current_datetime(date, sizeof(date));
+                    char *chemin_date = extract_from_date(dest_path);
+                    char *md5=calculate_md5(src_path);
+                    elem->path = chemin_date;
+                    elem->date = date;
+                    elem->md5 = md5;
+                    backup_file(src_path, dest_path);
                 }
             }
         }
