@@ -515,7 +515,7 @@ void backup_file(const char *filename, const char *backup_dir) {
     write_backup_file(backup_dir, chunks);
 
     fclose(file);
-    return;
+    free(chunks);
 }
 
 
@@ -545,6 +545,7 @@ void write_restored_file(const char *output_filename, Chunk_list chunks) {
         current = current->next;//On passe au chunk suivant
     }
     fclose(dest);
+    free(chunks);
 }
 
 /**
