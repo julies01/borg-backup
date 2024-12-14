@@ -1,4 +1,5 @@
 #include "network.h"
+#include "file_handler.h"
 
 void send_data(const char *server_address, int port, const void *data, size_t size) {
     // Implémenter la logique d'envoi de données à un serveur distant

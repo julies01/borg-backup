@@ -10,6 +10,8 @@
 
 #define BUFFER_SIZE 4096
 
+int verbose = 0;
+
 /**
  * @brief Affiche sur la sortie standard les fichiers, fichiers cachés et dossiers situés à l'endroit du chemin passé en paramètre. 
  * 
@@ -58,6 +60,13 @@ char **list_files(const char *path, int *count) {
     }
 
     closedir(d); // Fermer le dossier
+
+    if (verbose == 1) {
+        printf("Mode verbose activé. Liste des fichiers trouvés :\n");
+        for (int i = 0; i < *count; i++) {
+            printf("%s\n", file_list[i]);
+        }
+    }
     return file_list; // Retourner le tableau des fichiers
 }
 
@@ -124,7 +133,9 @@ void copy_file(const char *src, const char *dest) {
     close(src_fd);
     close(dest_fd);
 
-    printf("Fichier copié de %s vers %s\n", src, dest_path);
+    if (verbose) {
+        printf("Copie du fichier de %s vers %s terminée avec succès.\n", src, dest_path);
+    }
 }
 
 /**
@@ -167,6 +178,14 @@ log_t read_backup_log(const char *logfile){
     }
 
     fclose(file);
+    if (verbose) {
+        printf("Lecture du fichier de log %s terminée avec succès.\n", logfile);
+        log_element *current = logs.head;
+        while (current) {
+            printf("Chemin: %s, MD5: %s, Date: %s\n", current->path, current->md5, current->date);
+            current = current->next;
+        }
+    }
     return logs;
 }
  
@@ -235,6 +254,9 @@ void update_backup_log(const char *new_line, log_t *logs) {
     }
 
     logs->tail = new_elt;
+    if (verbose) {
+        printf("Ajout/Mise à jour de l'élément : Chemin = %s, MD5 = %s, Date = %s\n", new_elt->path, new_elt->md5, new_elt->date);
+    }
 }
 
 /**
@@ -253,5 +275,9 @@ void write_log_element(log_element *elt, FILE *logfile) {
     // Écriture des données au format spécifié : chemin,somme_md5,date\n
     if (fprintf(logfile, "%s,%s,%s\n", elt->path, elt->md5, elt->date) < 0) {
         perror("Erreur lors de l'écriture dans le fichier");
+    }
+
+    if (verbose) {
+        printf("Écriture de l'élément dans le fichier log : Chemin = %s, MD5 = %s, Date = %s\n", elt->path, elt->md5, elt->date);
     }
 }
