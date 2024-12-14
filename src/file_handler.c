@@ -145,36 +145,42 @@ void copy_file(const char *src, const char *dest) {
  * @param logfile chemin absolu ou relatif vers le fichier .backup_log
  * @return log_t liste doublement chainée avec les données lues dans le fichier
  */
-void read_backup_log(FILE *file, log_t *logs) {
+log_t read_backup_log(FILE *file) {
+    log_t logs = {NULL};
+
     if (!file) {
         perror("Erreur lors de l'ouverture du fichier de log");
-        return;
+        return logs;
     }
-    rewind(file);
 
-    char line[256];
-     while (fgets(line, sizeof(line), file)) {
-        log_element *elt = malloc(sizeof(log_element));
-        if (!elt) {
-            perror("Erreur d'allocation mémoire");
-            fclose(file);
+    // Repositionner le pointeur de fichier au début
+    rewind(file);
+    char line[512];
+    while (fgets(line, sizeof(line), file)) {
+        log_element *elem = malloc(sizeof(log_element));
+        if (!elem) {
+            fprintf(stderr, "Erreur d'allocation mémoire\n");
             return logs;
         }
 
-        elt->path = strdup(strtok(line, ","));    // Chemin
-        elt->md5 = strdup(strtok(NULL, ","));   // Somme md5
-        elt->date = strdup(strtok(NULL, "\n"));  // Date
-
-        elt->next = NULL;
-        elt->prev = logs->tail;
-
-        if (logs->tail) {
-            logs->tail->next = elt;
-        } else {
-            logs->head = elt;
+        elem->path = malloc(256);
+        elem->date = malloc(256);
+        elem->md5 = malloc(256);
+        if (!elem->path || !elem->date || !elem->md5) {
+            fprintf(stderr, "Erreur d'allocation mémoire\n");
+            free(elem->path);
+            free(elem->date);
+            free(elem->md5);
+            free(elem);
+            return logs;
         }
-        logs->tail = elt;
+
+        sscanf(line, "%255[^;];%255[^;];%255s", elem->path, elem->md5, elem->date);
+        elem->next = logs.head;
+        logs.head = elem;
     }
+
+    return logs;
 }
  
 /**
