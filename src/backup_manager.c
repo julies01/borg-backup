@@ -453,23 +453,47 @@ void create_backup(const char *source_dir, const char *backup_dir) {
  * @param output_filename le fichier de sortie
  * @param chunks le tableau de chunks
  */
-void write_backup_file(const char *output_filename, Chunk *chunks) {
-    /*
-    */
-    FILE *file = fopen(output_filename, "wb");
+void write_backup_file(const char *output_filename, Chunk_list chunks) {
+    FILE *file = fopen(output_filename, "wb");//Ouverture du fichier en écriture binaire
     if (!file) {
-        perror("Erreur lors de l'ouverture du fichier\n\n");
+        perror("Erreur lors de l'ouverture du fichier");
         return;
     }
-    while(chunks->next != NULL){
-        if(chunks->data != NULL){
-            int size = 4096;
-            size_t written_size = fwrite(chunks->data, size, 1, file);
-            if (written_size != 1) {
-                perror("Erreur lors de l'écriture dans le fichier");
+    Chunk *current = chunks;
+    int chunk_count = 0;
+    while(current != NULL){ //tant que le chunk courant n'est pas NULL (on est pas arrivés au bout de la liste chaînée)
+        chunk_count++;
+        char* identificator = (char*)malloc(30*sizeof(char)); //Création de l'identificateur
+        if (current->data == NULL){ //Gestion d'erreurs
+            printf("Erreur, il n'y a pas de data \n");
+        } else {
+            if(current->is_unique == 1){//Si le chunk courant est n'est pas unique
+                int index;
+                memcpy(&index, current->data, sizeof(int));// On copie dans index la valeur de la référence
+                sprintf(identificator, "!/(%d)/![*(%d)*]", chunk_count,index);
+                size_t ecriture = fwrite(identificator, strlen(identificator) * sizeof(char), 1, file); //On écrit l'index du chunk et la référence dans le fichier
+                free(identificator);//On libère la mémoire
+                if (ecriture != 1) { //Gestion d'erreurs
+                    perror("Erreur lors de l'écriture de l'index et de la référence dans le fichier");
+                }
+            }
+            else {
+                int index = 0;//Si le chunk est unique, on écrit l'index du chunk et la data dans le fichier
+                sprintf(identificator, "!/(%d)/![*(%d)*]", chunk_count,index);
+                size_t ecriture = fwrite(identificator, strlen(identificator) * sizeof(char), 1, file);
+                if (ecriture != 1) {//Gestion d'erreurs
+                    perror("Erreur lors de l'écriture de l'index et de la référence dans le fichier");
+                }
+                free(identificator);//On libère la mémoire
+                fwrite("\n", sizeof(char), 1, file);
+                size_t data = fwrite(current->data, CHUNK_SIZE, 1, file);//On écrit la data dans le fichier
+                if (data != 1) {// Gestion d'erreurs
+                    perror("Erreur lors de l'écriture de la data dans le fichier");
+                }
             }
         }
-        chunks = chunks->next;
+        fwrite("\n", sizeof(char), 1, file);
+        current = current->next;//On passe au chunk suivant
     }
     fclose(file);
     return;
@@ -483,10 +507,9 @@ void write_backup_file(const char *output_filename, Chunk *chunks) {
  */
 void backup_file(const char *filename, const char *backup_dir) {
     printf("Sauvegarde du fichier : %s\n", filename);
-    FILE *file = fopen(filename, "rb");
-    Md5Entry *hash_table[HASH_TABLE_SIZE] = {0};
-    size_t max_chunks = 1000;
-    Chunk_list chunks = NULL;
+    FILE *file = fopen(filename, "rb"); // Ouverture du fichier en lecture binaire
+    Md5Entry *hash_table[HASH_TABLE_SIZE] = {NULL}; // Initialisation de la table de hachage
+    Chunk_list chunks = NULL; // Initialisation de la liste de chunks
 
     deduplicate_file(file, &chunks, hash_table);
     write_backup_file(backup_dir, chunks);
@@ -503,23 +526,24 @@ void backup_file(const char *filename, const char *backup_dir) {
  * @param chunks tableau de chunks
  * @param chunk_count nombre de chunks contenus dans le tableau
  */
-void write_restored_file(const char *output_filename, Chunk *chunks, int chunk_count) {
-    FILE *dest = fopen(output_filename, "wb");
-    if (!dest){
+void write_restored_file(const char *output_filename, Chunk_list chunks) {
+    FILE *dest = fopen(output_filename, "wb");//Ouverture du fichier en écriture binaire
+    if (!dest){ //Gestion d'erreurs
         fprintf(stderr, "erreur : impossible de créer le fichier %s : %s\n", output_filename, strerror(errno));
         return;
     }
-    for (int i = 0; i < chunk_count && chunks != NULL; i++, chunks = chunks->next) {
-        if (chunks->data != NULL){
-            size_t written_size = fwrite(chunks->data, CHUNK_SIZE, 1, dest);
-            if (written_size != 1) {
-                fprintf(stderr, "erreur : ecriture incomplète dans %s : %s\n", output_filename, strerror(errno));
-                fclose(dest);
-                return;
+    Chunk *current = chunks;
+    while (current != NULL){ //Tant que le chunk courant n'est pas NULL (qu'on est pas arrivés au bout de la liste chaînée)
+        if (current->data == NULL){ //Gestion d'erreurs
+            printf("Erreur, il n'y a pas de data\n");
+        } else {
+            size_t data = fwrite(current->data, CHUNK_SIZE, 1, dest); //On écrit la data du chunk dans le fichier
+            if (data != 1) {
+                perror("Erreur lors de l'écriture de la data dans le fichier");
             }
         }
+        current = current->next;//On passe au chunk suivant
     }
-
     fclose(dest);
 }
 

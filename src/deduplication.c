@@ -1,5 +1,4 @@
 #include "deduplication.h"
-#include "file_handler.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -29,8 +28,11 @@ unsigned int hash_md5(unsigned char *md5) {
  * @param md5_out la somme MD5 du chunk en sortie
  */
 void compute_md5(void *data, size_t len, unsigned char *md5_out) {
-    MD5(data, len, md5_out);// Fonction de la librairie openssl qui permet de calculer le MD5 d'un chunk
-
+    if (md5_out == NULL) {
+        fprintf(stderr, "md5_out buffer is not allocated\n");
+        exit(EXIT_FAILURE);
+    }
+    MD5(data, len, md5_out); // Fonction de la librairie openssl qui permet de calculer le MD5 d'un chunk
 }
 
 
@@ -117,6 +119,28 @@ Chunk_list add_unique_chunk(Chunk_list chunk,unsigned char *md5, unsigned char *
         new_el->prev = current;
         return chunk;
     }
+}
+
+/**
+ * @brief Create a index object
+ * 
+ * @param chunk la liste de chunks
+ * @param md5 la somme MD5 du chunk déjà présent dont on cherche l'index
+ * @return int l'index du chunk
+ */
+
+int create_index(Chunk_list chunk, unsigned char *md5){
+    int index = 1;
+    Chunk *current = chunk;
+    while (current != NULL){
+        if (memcmp(current->md5, md5, MD5_DIGEST_LENGTH) == 0){
+            return index;
+        }
+        index++;
+        current = current->next;
+    }
+
+    return index;
 }
 
 /**
@@ -226,24 +250,48 @@ void deduplicate_file(FILE *file, Chunk_list *chunks, Md5Entry **hash_table) {
 
     while ((bytes_lus = fread(tampon, 1, CHUNK_SIZE, file)) > 0) { // Lecture du fichier en chunks
         compute_md5(tampon, bytes_lus, hash);
-        int index = find_md5(hash_table, hash);
-        if (index == -1) { // Si le chunk n'est pas déjà présent dans la table de hachage 
-            index = hash_md5(hash);
-            add_md5(hash_table, hash, index); // Ajout du chunk dans la table de hachage
+        int index_h = find_md5(hash_table, hash);
+        if (index_h == -1) { // Si le chunk n'est pas déjà présent dans la table de hachage 
+            index_h = hash_md5(hash);
+            add_md5(hash_table, hash, index_h); // Ajout du chunk dans la table de hachage
             *chunks = add_unique_chunk(*chunks, hash, tampon); // Ajout du chunk dans la liste de chunks
             nb_chunks++;
         } else {
-            *chunks = add_seen_chunk(*chunks, hash, index); // Ajout du chunk dans la liste de chunks
+            int index_c = create_index(*chunks, hash);
+            *chunks = add_seen_chunk(*chunks, hash, index_c); // Ajout du chunk dans la liste de chunks
             nb_chunks++;
         }
     }
 
-    see_hash_table(hash_table);
+    /*see_hash_table(hash_table);
     printf("____________________________________________________________________________________\n\n");
     see_chunk_list(*chunks);
-    printf("____________________________________________________________________________________\n\n");
+    printf("____________________________________________________________________________________\n\n");*/
     printf("Nombre de chunks : %d\n", nb_chunks);
 }
+
+
+int extract_second_number(const char *identificator) {
+    const char *start = strstr(identificator, "[*(");
+    int number;
+    sscanf(start + 3, "%d", &number);
+    return number;
+}
+
+void find_data_in_chunklist(Chunk_list chunk, int index, void **data) {
+    Chunk *current = chunk;
+    int compteur = 1;
+    while (compteur != index){
+        compteur++;
+        current = current->next;
+    }
+    if (current->data == NULL){
+        printf("Erreur, il n'y a pas de data\n");
+    } else {
+        *data = current->data;
+    }
+}
+
 
 
 /**
@@ -253,34 +301,44 @@ void deduplicate_file(FILE *file, Chunk_list *chunks, Md5Entry **hash_table) {
  * @param chunks représente le tableau de chunk qui contiendra les chunks restauré depuis filename
  * @param chunk_count est un compteur du nombre de chunk restauré depuis le fichier filename
  */
-/*void undeduplicate_file(FILE *file, Chunk *chunks, int *chunk_count) {
+
+void undeduplicate_file(FILE *file, Chunk_list *chunks) {
     unsigned char hash[MD5_DIGEST_LENGTH];
     unsigned char tampon[CHUNK_SIZE];
+    char *line = (char*)malloc(30 * sizeof(char));
+    if (line == NULL) {
+        fprintf(stderr, "Memory allocation failed for line\n");
+        return;
+    }
     size_t bytes_lus;
 
-    while ((bytes_lus = fread(hash, 1, MD5_DIGEST_LENGTH, file)) > 0) { // Lecture des sommes MD5 des chunks du fichier 
-        int i;
-        int index = find_md5(hash_table, hash); // Recherche de la somme MD5 dans la table de hachage
-        if (index == -1) {
-            fprintf(stderr, "Erreur: chunk introuvable dans la table de hachage\n");
-            return;
-        }
+    fseek(file, 0, SEEK_SET);
 
-        int trouve = 0;
-        for (i = 0; i < *chunk_count; i++) {
-            if (memcmp(chunks[i].md5, hash,MD5_DIGEST_LENGTH) == 0) {
-                memcpy(tampon, chunks[index].data, CHUNK_SIZE); //On copie le chunk dans le tampon
-                fwrite(tampon, 1, CHUNK_SIZE, file);
-                (*chunk_count)++;
-                trouve = 1;
-                break;
+    while (!feof(file)) {
+        if (fgets(line, 30, file) != NULL) {
+            if (strstr(line, "!/(") != NULL) { // Si la ligne contient un identificateur
+                int index = extract_second_number(line);
+                if (index != 0) { // Si le chunk contient une référence à un autre chunk
+                    void *data = NULL;
+                    find_data_in_chunklist(*chunks, index, &data);
+                    if (data == NULL) {
+                        fprintf(stderr, "Data not found for index %d\n", index);
+                        continue;
+                    }
+                    compute_md5(data, CHUNK_SIZE, hash);
+                    *chunks = add_unique_chunk(*chunks, hash, data);
+                } else {
+                    bytes_lus = fread(tampon, 1, CHUNK_SIZE, file);
+                    if (bytes_lus > 0) {
+                        compute_md5(tampon, bytes_lus, hash);
+                        *chunks = add_unique_chunk(*chunks, hash, tampon);
+                    } else {
+                        fprintf(stderr, "Failed to read chunk from file\n");
+                    }
+                }
             }
         }
-        if (!trouve) {
-            fprintf(stderr, "Erreur: chunk correspondant au hash introuvable\n");
-            return;
-        }
     }
-   
-}*/
 
+    free(line);
+}
