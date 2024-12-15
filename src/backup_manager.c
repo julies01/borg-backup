@@ -20,23 +20,50 @@
 
 #define PATH_MAX 4096
 
-void add_log_element(log_t *logs, log_element *elem) {
-    printf("Ajout de l'élément %s\n", elem->path);
-    if (logs->tail == NULL) {
-        // La liste est vide, initialiser head et tail
-        logs->head = elem;
-        logs->tail = elem;
-        elem->prev = NULL;
-        elem->next = NULL;
+/**
+ * @brief Fonction pour supprimer le chemin jusqu'au premier slash
+ * 
+ * @param path 
+ * @return char* 
+ */
+
+char* remove_until_first_slash(const char *path) {
+    const char *slash_pos = strchr(path, '/');
+    if (slash_pos) {
+        return strdup(slash_pos + 1);
     } else {
-        // Ajouter l'élément à la fin de la liste
-        elem->prev = logs->tail;
-        elem->next = NULL;
-        logs->tail->next = elem;
-        logs->tail = elem;
+        return strdup(path);
     }
 }
 
+/**
+ * @brief Fonction pour supprimer le chemin après le dernier slash
+ * 
+ * @param path 
+ * @return char* 
+ */
+char* remove_after_last_slash(const char *path) {
+    const char *slash_pos = strrchr(path, '/');
+    if (slash_pos) {
+        size_t length = slash_pos - path;
+        char *result = (char *)malloc(length + 1);
+        if (result) {
+            strncpy(result, path, length);
+            result[length] = '\0';
+        }
+        return result;
+    } else {
+        return strdup(path);
+    }
+}
+
+/**
+ * @brief Fonction pour vérifier si un fichier existe dans un répertoire
+ * 
+ * @param file_path 
+ * @param directory 
+ * @return int 
+ */
 int file_exists_in_directory(const char *file_path, const char *directory) {
     DIR *dir;
     struct dirent *entry;
@@ -45,7 +72,7 @@ int file_exists_in_directory(const char *file_path, const char *directory) {
     if (!relative_file_path) {
         relative_file_path = file_path;
     } else {
-        relative_file_path++; // Skip the '/'
+        relative_file_path++;
     }
 
     dir = opendir(directory);
@@ -74,6 +101,13 @@ int file_exists_in_directory(const char *file_path, const char *directory) {
     return 0;
 }
 
+/**
+ * @brief Fonction pour vérifier si un fichier existe dans un log
+ * 
+ * @param file_path 
+ * @param logs 
+ * @return log_element* 
+ */
 log_element* file_exists_in_log(const char *file_path, log_t *logs) {
     log_element *current = logs->head;
     const char *file_name = strrchr(file_path, '/');
@@ -99,15 +133,19 @@ log_element* file_exists_in_log(const char *file_path, log_t *logs) {
     return NULL;
 }
 
+/**
+ * @brief Fonction qui retourne la date au format : YYYY-MM-DD-HH:MM:SS.sss
+ * 
+ * @param buffer 
+ * @param buffer_size 
+ */
 void get_current_datetime(char *buffer, size_t buffer_size) {
     struct timeval tv;
     struct tm *tm_info;
 
-    // Obtenir l'heure actuelle avec précision jusqu'aux millisecondes
     gettimeofday(&tv, NULL);
     tm_info = localtime(&tv.tv_sec);
 
-    // Écrire la date et l'heure au format "YYYY-MM-DD-hh:mm:ss.sss"
     snprintf(buffer, buffer_size, "%04d-%02d-%02d-%02d:%02d:%02d.%03ld",
              tm_info->tm_year + 1900, // Année
              tm_info->tm_mon + 1,    // Mois (de 0 à 11)
@@ -118,6 +156,12 @@ void get_current_datetime(char *buffer, size_t buffer_size) {
              tv.tv_usec / 1000);     // Millisecondes (µsecondes converties)
 }
 
+/**
+ * @brief Fonction pour calculer le hash MD5 d'un fichier
+ * 
+ * @param filename 
+ * @return char* 
+ */
 char *calculate_md5(const char *filename) {
     FILE *file = fopen(filename, "rb");
     if (!file) {
@@ -128,7 +172,7 @@ char *calculate_md5(const char *filename) {
     MD5_CTX md5_ctx;
     unsigned char data[1024];
     unsigned char hash[MD5_DIGEST_LENGTH];
-    char *md5_string = malloc(MD5_DIGEST_LENGTH * 2 + 1); // 2 caractères par octet + 1 pour '\0'
+    char *md5_string = malloc(MD5_DIGEST_LENGTH * 2 + 1);
 
     if (!md5_string) {
         fprintf(stderr, "Erreur d'allocation mémoire\n");
@@ -138,7 +182,6 @@ char *calculate_md5(const char *filename) {
 
     MD5_Init(&md5_ctx);
 
-    // Lecture du fichier par blocs et mise à jour du calcul MD5
     size_t bytes_read;
     while ((bytes_read = fread(data, 1, sizeof(data), file)) > 0) {
         MD5_Update(&md5_ctx, data, bytes_read);
@@ -154,7 +197,6 @@ char *calculate_md5(const char *filename) {
     MD5_Final(hash, &md5_ctx);
     fclose(file);
 
-    // Convertir le hash en une chaîne hexadécimale
     for (int i = 0; i < MD5_DIGEST_LENGTH; i++) {
         sprintf(&md5_string[i * 2], "%02x", hash[i]);
     }
@@ -162,39 +204,52 @@ char *calculate_md5(const char *filename) {
     return md5_string;
 }
 
+/**
+ * @brief Fonction pour extraire tout ceux qui est après la date dans un chemin ansi que la date devant le chemin
+ * 
+ * @param path 
+ * @return char* 
+ */
 char *extract_from_date(const char *path) {
     const char *pattern = "[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}";
     regex_t regex;
     regmatch_t match;
 
-    // Compile le pattern
     if (regcomp(&regex, pattern, REG_EXTENDED) != 0) {
         fprintf(stderr, "Erreur : Impossible de compiler l'expression régulière.\n");
         return NULL;
     }
 
-    // Cherche le pattern dans le chemin
     if (regexec(&regex, path, 1, &match, 0) == 0) {
-        // Trouve la position du début de la date
         size_t start = match.rm_so;
-        // Alloue la mémoire pour le résultat
         char *result = strdup(path + start);
-        regfree(&regex); // Libère la mémoire du regex
+        regfree(&regex);
         return result;
     }
 
-    // Si aucun match n'est trouvé
     regfree(&regex);
     return NULL;
 }
 
-// Fonction pour convertir un nom de dossier en structure tm (date)
+/**
+ * @brief Fonction pour convertir un nom de dossier en structure tm (date)
+ * 
+ * @param folder_name 
+ * @param result 
+ * @return int 
+ */
 int parse_folder_date(const char *folder_name, struct tm *result) {
     return sscanf(folder_name, "%4d-%2d-%2d-%2d:%2d:%2d.%3d",
                   &result->tm_year, &result->tm_mon, &result->tm_mday,
                   &result->tm_hour, &result->tm_min, &result->tm_sec, &(int){0}) == 7;
 }
 
+/**
+ * @brief Fonction pour trouver le dossier le plus récent dans un répertoire
+ * 
+ * @param base_path 
+ * @return char* 
+ */
 char *find_most_recent_folder(const char *base_path) {
     DIR *dir = opendir(base_path);
     if (!dir) {
@@ -207,12 +262,10 @@ char *find_most_recent_folder(const char *base_path) {
     char *most_recent_folder = NULL;
 
     while ((entry = readdir(dir)) != NULL) {
-        // Ignore les dossiers "." et ".."
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
             continue;
         }
 
-        // Vérifie si c'est un dossier
         char path[1024];
         snprintf(path, sizeof(path), "%s/%s", base_path, entry->d_name);
 
@@ -220,14 +273,13 @@ char *find_most_recent_folder(const char *base_path) {
         if (stat(path, &statbuf) == 0 && S_ISDIR(statbuf.st_mode)) {
             struct tm folder_tm = {0};
             if (parse_folder_date(entry->d_name, &folder_tm)) {
-                folder_tm.tm_year -= 1900; // tm_year est compté depuis 1900
-                folder_tm.tm_mon -= 1;    // tm_mon est compté de 0 à 11
+                folder_tm.tm_year -= 1900;
+                folder_tm.tm_mon -= 1;
 
-                // Comparer la date actuelle avec la plus récente
                 time_t folder_time = mktime(&folder_tm);
                 time_t most_recent_time = mktime(&most_recent_tm);
                 if (most_recent_folder == NULL || difftime(folder_time, most_recent_time) > 0) {
-                    free(most_recent_folder); // Libère la mémoire de la précédente si nécessaire
+                    free(most_recent_folder);
                     most_recent_folder = strdup(entry->d_name);
                     most_recent_tm = folder_tm;
                 }
@@ -239,6 +291,12 @@ char *find_most_recent_folder(const char *base_path) {
     return most_recent_folder;
 }
 
+/**
+ * @brief fonction pour copier un fichier avec les liens durs
+ * 
+ * @param source 
+ * @param destination 
+ */
 void copy_file_link(const char *source, const char *destination) {
     int source_fd, dest_fd;
     struct stat stat_buf;
@@ -320,6 +378,14 @@ void copy_directory_link(const char *source, const char *destination) {
     closedir(dir);
 }
 
+/**
+ * @brief fonction pour copier un dossier tout en écrivant toute les modifications dans le fichier de log
+ * 
+ * @param source_dir 
+ * @param dest_dir 
+ * @param log 
+ * @param new 
+ */
 void copy_directory(const char *source_dir, const char *dest_dir, FILE *log, int new) {
     DIR *dir = opendir(source_dir);
     if (!dir) {
@@ -361,12 +427,14 @@ void copy_directory(const char *source_dir, const char *dest_dir, FILE *log, int
                     backup_file(src_path, dest_path);
                 }
         }
+        fclose(log);
     }else{
         log_t *logs = malloc(sizeof(log_t));
         *logs = read_backup_log(log);
         log_element *current = logs->head;
         if (current == NULL) {
             printf("Aucun élément de log trouvé.\n");
+            return;
         } else {
             while ((entry = readdir(dir)) != NULL) {
                 if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
@@ -418,6 +486,51 @@ void copy_directory(const char *source_dir, const char *dest_dir, FILE *log, int
                     backup_file(src_path, dest_path);
                 }
             }
+            while (current != NULL){
+                int est_present = file_exists_in_directory(current->path, source_dir);
+                if(est_present==0){
+
+                    char chemin[PATH_MAX] = "";
+                    strcat(chemin, dest_dir);
+                    strcat(chemin, "/");
+                    strcat(chemin, remove_until_first_slash(current->path));
+                    if (unlink(chemin) == -1) {
+                        perror("unlink");
+                    }
+                    if(current->prev == NULL && current->next == NULL){
+                        logs->head = NULL;
+                        logs->tail = NULL;
+                    }else if(current->prev == NULL){
+                        logs->head = current->next;
+                    }else if(current->next == NULL){
+                        logs->tail = current->prev;
+                    }else{
+                        current->prev->next = current->next;
+                        current->next->prev = current->prev;
+                    }
+                    current = current->next;
+                }else{
+                    current = current->next;
+                }
+            }
+            current = logs->head;
+            int i = 0;
+            fclose(log);
+            char log[PATH_MAX] = "";
+            strcat(log, remove_after_last_slash(dest_dir));
+            strcat(log, "/.backup_log");
+            printf("Ecriture du log dans : %s\n", log);
+            FILE *file_log = fopen(log, "w");
+            if(file_log == NULL){
+                perror("Erreur lors de l'ouverture du fichier de log");
+                exit(EXIT_FAILURE);
+            }
+            while (current != NULL){
+                write_log_element(current, file_log);
+                current = current->next;
+                i++;
+            }
+            fclose(file_log);
         }
     }
     closedir(dir);
@@ -446,7 +559,7 @@ void get_current_timestamp(char *buffer, size_t size) {
  */
 void create_backup(const char *source_dir, const char *backup_dir) {
     char date_str[64];
-    char fichierlog[128];
+    char fichierlog[PATH_MAX];
     get_current_timestamp(date_str, sizeof(date_str));
     mkdir(backup_dir, 0755);
     char new_backup_dir[PATH_MAX];
@@ -473,7 +586,6 @@ void create_backup(const char *source_dir, const char *backup_dir) {
         perror("Erreur lors de la création du répertoire de sauvegarde");
         exit(EXIT_FAILURE);
     }
-    fclose(log);
 
     printf("Sauvegarde terminée dans : %s\n", new_backup_dir);
 }
