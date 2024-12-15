@@ -386,7 +386,8 @@ void copy_directory_link(const char *source, const char *destination) {
  * @param log 
  * @param new 
  */
-void copy_directory(const char *source_dir, const char *dest_dir, FILE *log, int new) {
+log_t copy_directory(const char *source_dir, const char *dest_dir, FILE *log, int new) {
+    //printf("Copie du répertoire %s vers : %s\n", source_dir, dest_dir);
     DIR *dir = opendir(source_dir);
     if (!dir) {
         perror("Erreur lors de l'ouverture du répertoire source");
@@ -395,11 +396,11 @@ void copy_directory(const char *source_dir, const char *dest_dir, FILE *log, int
 
     struct dirent *entry;
     struct stat statbuf;
+    log_t logs = {NULL, NULL};
 
     mkdir(dest_dir, 0755);
     if(new==1){
         while ((entry = readdir(dir)) != NULL) {
-                printf("Copie de %s/%s\n", dest_dir, entry->d_name);
                 if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
                     continue;
                 }
@@ -407,31 +408,30 @@ void copy_directory(const char *source_dir, const char *dest_dir, FILE *log, int
                 char dest_path[PATH_MAX];
                 snprintf(src_path, sizeof(src_path), "%s/%s", source_dir, entry->d_name);
                 snprintf(dest_path, sizeof(dest_path), "%s/%s", dest_dir, entry->d_name);
-                printf("Copie de %s vers %s\n", src_path, dest_path);
-                log_element *elem = malloc(sizeof(log_element));
-                char date[64];
-                get_current_datetime(date, sizeof(date));
-                char *chemin_date = extract_from_date(dest_path);
-                elem->path = chemin_date;
-                elem->date = date;
-                elem->md5 = calculate_md5(src_path);
-                write_log_element(elem,log);
+                //printf("Copie de %s vers %s\n", src_path, dest_path);
                 if (stat(src_path, &statbuf) == -1) {
                     perror("Erreur lors de la récupération des informations sur un fichier");
                     continue;
                 }
 
                 if (S_ISDIR(statbuf.st_mode)) {
-                    copy_directory(src_path, dest_path, log, 0);
+                    printf("\n\nCopie du répertoire %s vers : %s\n\n\n", src_path, dest_path);
+                    copy_directory(src_path, dest_path, log, 1);
                 } else {
+                    log_element *elem = malloc(sizeof(log_element));
+                    char date[64];
+                    get_current_datetime(date, sizeof(date));
+                    char *chemin_date = extract_from_date(dest_path);
+                    elem->path = chemin_date;
+                    elem->date = date;
+                    elem->md5 = calculate_md5(src_path);
+                    write_log_element(elem,log);
                     backup_file(src_path, dest_path);
                 }
         }
-        fclose(log);
     }else{
-        log_t *logs = malloc(sizeof(log_t));
-        *logs = read_backup_log(log);
-        log_element *current = logs->head;
+        logs = read_backup_log(log);
+        log_element *current = logs.head;
         if (current == NULL) {
             printf("Aucun élément de log trouvé.\n");
             return;
@@ -445,65 +445,99 @@ void copy_directory(const char *source_dir, const char *dest_dir, FILE *log, int
                 snprintf(src_path, sizeof(src_path), "%s/%s", source_dir, entry->d_name);
                 snprintf(dest_path, sizeof(dest_path), "%s/%s", dest_dir, entry->d_name);
                 printf("Copie de %s vers %s\n", src_path, dest_path);
-                int est_present = file_exists_in_directory(src_path, dest_dir);
-                if(est_present){
-                    log_element *elem = malloc(sizeof(log_element));
-                    char *test = extract_from_date(dest_path);
-                    printf("Date : %s\n", test);
-                    elem = file_exists_in_log(test, logs);
-                    char *md5=calculate_md5(src_path);
-                    if(elem==NULL){
-                        printf("Le fichier %s n'est pas présent dans %s\n", src_path, dest_dir);
-                    }else{
-                        if(strcmp(md5,elem->md5)==0){
-                            char *chemin_date = extract_from_date(dest_path);
-                            elem->path = chemin_date;
-                        }else{
-                            printf("Le fichier %s a été modifié\n", src_path);
-                            char date[64];
-                            get_current_datetime(date, sizeof(date));
-                            char *chemin_date = extract_from_date(dest_path);
-                            elem->path = chemin_date;
-                            elem->date = date;
-                            elem->md5 = md5;
-                            backup_file(src_path, dest_path);
-                        }
+                if (stat(src_path, &statbuf) == -1) {
+                    perror("Erreur lors de la récupération des informations sur un fichier");
+                    continue;
+                }
+
+                if (S_ISDIR(statbuf.st_mode)) {
+                    printf("\n\n\n\nCopie du répertoire %s vers : %s\n\n\n", src_path, dest_path);
+                    log_t logs_2= copy_directory(src_path, dest_path, log, 0);
+                    log_element *current_2 = logs_2.head;
+                    log_element *current_3 = logs.head;
+                    while (current_2 != NULL)
+                    {
+                        printf("Ecriture de l'élément de log : %s\n", current_2->path);
+                        current_2 = current_2->next;
                     }
-                }else{
-                    printf("Le fichier %s n'est pas présent dans %s\n", src_path, dest_dir);
-                    log_element *elem = malloc(sizeof(log_element));
-                    elem->prev = logs->tail;
-                    elem->next = NULL;
-                    logs->tail->next = elem;
-                    logs->tail = elem;
-                    char date[64];
-                    get_current_datetime(date, sizeof(date));
-                    char *chemin_date = extract_from_date(dest_path);
-                    char *md5=calculate_md5(src_path);
-                    elem->path = chemin_date;
-                    elem->date = date;
-                    elem->md5 = md5;
-                    backup_file(src_path, dest_path);
+                    while (current_3 != NULL)
+                    {
+                        printf("jkdfvnjkfdnjvEcriture de l'élément de log : %s\n", current_3->path);
+                        current_3 = current_3->next;
+                    }
+                    
+                    if(logs.head == NULL){
+                        logs.head = logs_2.head;
+                        logs.tail = logs_2.tail;
+                    }else{
+                        logs.tail->next = logs_2.head;
+                        logs.tail = logs_2.tail;
+                    }
+                } else {
+                    int est_present = file_exists_in_directory(src_path, dest_dir);
+                    if(est_present){
+                        log_element *elem = malloc(sizeof(log_element));
+                        char *test = extract_from_date(dest_path);
+                        printf("Date : %s\n", test);
+                        elem = file_exists_in_log(test, &logs);
+                        char *md5=calculate_md5(src_path);
+                        if(elem==NULL){
+                            printf("Le fichier %s n'est pas présent dans %s\n", src_path, dest_dir);
+                        }else{
+                            if(strcmp(md5,elem->md5)==0){
+                                char *chemin_date = extract_from_date(dest_path);
+                                elem->path = chemin_date;
+                            }else{
+                                printf("Le fichier %s a été modifié\n", src_path);
+                                char date[64];
+                                get_current_datetime(date, sizeof(date));
+                                char *chemin_date = extract_from_date(dest_path);
+                                elem->path = chemin_date;
+                                elem->date = date;
+                                elem->md5 = md5;
+                                backup_file(src_path, dest_path);
+                            }
+                        }
+                    }else{
+                        printf("Le fichier %s n'est pas présent dans %s\n", src_path, dest_dir);
+                        log_element *elem = malloc(sizeof(log_element));
+                        elem->prev = logs.tail;
+                        elem->next = NULL;
+                        logs.tail->next = elem;
+                        logs.tail = elem;
+                        char date[64];
+                        get_current_datetime(date, sizeof(date));
+                        char *chemin_date = extract_from_date(dest_path);
+                        char *md5=calculate_md5(src_path);
+                        elem->path = chemin_date;
+                        elem->date = date;
+                        elem->md5 = md5;
+                        backup_file(src_path, dest_path);
+                    }
                 }
             }
             while (current != NULL){
+                char dest_path[PATH_MAX] = "";
+                char scr_path[PATH_MAX] = "";
+                strcat(dest_path, remove_after_last_slash(dest_dir));
+                strcat(dest_path, "/");
+                strcat(dest_path, current->path);
+                strcat(scr_path, source_dir);
+                strcat(scr_path, "/");
+                strcat(scr_path, remove_after_last_slash(remove_until_first_slash(current->path)));
                 int est_present = file_exists_in_directory(current->path, source_dir);
                 if(est_present==0){
-
-                    char chemin[PATH_MAX] = "";
-                    strcat(chemin, dest_dir);
-                    strcat(chemin, "/");
-                    strcat(chemin, remove_until_first_slash(current->path));
-                    if (unlink(chemin) == -1) {
+                    printf("supression de : %s\n", dest_path);
+                    if (unlink(dest_path) == -1) {
                         perror("unlink");
                     }
                     if(current->prev == NULL && current->next == NULL){
-                        logs->head = NULL;
-                        logs->tail = NULL;
+                        logs.head = NULL;
+                        logs.tail = NULL;
                     }else if(current->prev == NULL){
-                        logs->head = current->next;
+                        logs.head = current->next;
                     }else if(current->next == NULL){
-                        logs->tail = current->prev;
+                        logs.tail = current->prev;
                     }else{
                         current->prev->next = current->next;
                         current->next->prev = current->prev;
@@ -513,27 +547,10 @@ void copy_directory(const char *source_dir, const char *dest_dir, FILE *log, int
                     current = current->next;
                 }
             }
-            current = logs->head;
-            int i = 0;
-            fclose(log);
-            char log[PATH_MAX] = "";
-            strcat(log, remove_after_last_slash(dest_dir));
-            strcat(log, "/.backup_log");
-            printf("Ecriture du log dans : %s\n", log);
-            FILE *file_log = fopen(log, "w");
-            if(file_log == NULL){
-                perror("Erreur lors de l'ouverture du fichier de log");
-                exit(EXIT_FAILURE);
-            }
-            while (current != NULL){
-                write_log_element(current, file_log);
-                current = current->next;
-                i++;
-            }
-            fclose(file_log);
         }
     }
     closedir(dir);
+    return logs;
 }
 
 /**
@@ -568,6 +585,7 @@ void create_backup(const char *source_dir, const char *backup_dir) {
     strcat(fichierlog, "/");
     strcat(fichierlog, ".backup_log");
     FILE *log = fopen(fichierlog, "r");
+    log_t list_logs = {NULL, NULL};
     if(log == NULL){
         log = fopen(fichierlog, "a");
         printf("Copie des fichier de : %s dans : %s\n", source_dir, new_backup_dir);
@@ -579,14 +597,24 @@ void create_backup(const char *source_dir, const char *backup_dir) {
         strcat(backup_dir, closest_backup);
         printf("Restauration de la sauvegarde la plus proche : %s\n", closest_backup);
         copy_directory_link(backup_dir, new_backup_dir);
-        copy_directory(source_dir, new_backup_dir, log, 0);
-        return;
+        list_logs = copy_directory(source_dir, new_backup_dir, log, 0);
     }
     if (mkdir(new_backup_dir, 0755) == -1 && errno != EEXIST) {
         perror("Erreur lors de la création du répertoire de sauvegarde");
         exit(EXIT_FAILURE);
     }
-
+    fclose(log);
+    if(list_logs.head != NULL){
+        FILE *file_log = fopen(fichierlog, "w");
+        log_element *current = list_logs.head;
+        while (current != NULL){
+            printf("Ecriture de l'élément de log : %s\n", current->path);
+            write_log_element(current, file_log);
+            current = current->next;
+        }
+    }else{
+        printf("Aucun élément de log à écrire\n");
+    }
     printf("Sauvegarde terminée dans : %s\n", new_backup_dir);
 }
 
